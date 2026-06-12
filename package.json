@@ -1,81 +1,9 @@
 {
-	"name": "overrule",
-	"version": "0.3.1",
-	"description": "Catch Tailwind class conflicts in dev and CI, fix them in source, ship none of tailwind-merge.",
-	"license": "MIT",
-	"author": {
-		"name": "Nic Polumeyv",
-		"url": "https://github.com/Nic-Polumeyv"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/Nic-Polumeyv/overrule.git"
-	},
-	"type": "module",
-	"engines": {
-		"node": ">=20"
-	},
-	"keywords": [
-		"tailwind",
-		"tailwindcss",
-		"tailwind-merge",
-		"class conflicts",
-		"lint",
-		"codemod"
-	],
-	"bin": {
-		"overrule": "dist/cli.js"
-	},
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
-		},
-		"./css": {
-			"types": "./dist/css.d.ts",
-			"default": "./dist/css.js"
-		},
-		"./css/node": {
-			"types": "./dist/css-node.d.ts",
-			"default": "./dist/css-node.js"
-		},
-		"./parse": {
-			"types": "./dist/parse.d.ts",
-			"default": "./dist/parse.js"
-		},
-		"./test": {
-			"types": "./dist/test.d.ts",
-			"default": "./dist/test.js"
-		}
-	},
-	"files": [
-		"dist"
-	],
-	"scripts": {
-		"build": "rm -rf dist && tsc -p tsconfig.json",
-		"test": "bun test",
-		"prepublishOnly": "bun run build && bunx publint"
-	},
-	"dependencies": {
-		"tailwind-merge": "^3.6.0"
-	},
-	"peerDependencies": {
-		"@tailwindcss/node": ">=4.2.0 <5",
-		"tailwindcss": ">=4.2.0 <5"
-	},
-	"peerDependenciesMeta": {
-		"@tailwindcss/node": {
-			"optional": true
-		},
-		"tailwindcss": {
-			"optional": true
-		}
-	},
+	"name": "overrule-rs-dev",
+	"private": true,
+	"description": "dev-only: the cross end-to-end test and the --css oracle resolve tailwindcss from here when the scanned project has none",
 	"devDependencies": {
 		"@tailwindcss/node": "^4.3.0",
-		"@types/bun": "^1.3.14",
-		"@types/node": "^25.9.3",
-		"tailwindcss": "^4.3.0",
-		"typescript": "^6.0.3"
+		"tailwindcss": "^4.3.0"
 	}
 }

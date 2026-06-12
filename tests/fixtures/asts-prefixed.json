@@ -1,0 +1,32 @@
+{
+	"tw:p-2": [
+		{
+			"kind": "rule",
+			"selector": ".tw\\:p-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "padding",
+					"value": "calc(var(--tw-spacing) * 2)",
+					"important": false
+				}
+			]
+		}
+	],
+	"tw:p-4": [
+		{
+			"kind": "rule",
+			"selector": ".tw\\:p-4",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "padding",
+					"value": "calc(var(--tw-spacing) * 4)",
+					"important": false
+				}
+			]
+		}
+	],
+	"p-2": [],
+	"p-4": []
+}

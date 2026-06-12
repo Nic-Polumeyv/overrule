@@ -1,0 +1,2517 @@
+{
+	"h-9": [
+		{
+			"kind": "rule",
+			"selector": ".h-9",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "height",
+					"value": "calc(var(--spacing) * 9)",
+					"important": false
+				}
+			]
+		}
+	],
+	"px-4": [
+		{
+			"kind": "rule",
+			"selector": ".px-4",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "padding-inline",
+					"value": "calc(var(--spacing) * 4)",
+					"important": false
+				}
+			]
+		}
+	],
+	"h-8": [
+		{
+			"kind": "rule",
+			"selector": ".h-8",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "height",
+					"value": "calc(var(--spacing) * 8)",
+					"important": false
+				}
+			]
+		}
+	],
+	"px-2": [
+		{
+			"kind": "rule",
+			"selector": ".px-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "padding-inline",
+					"value": "calc(var(--spacing) * 2)",
+					"important": false
+				}
+			]
+		}
+	],
+	"text-sm": [
+		{
+			"kind": "rule",
+			"selector": ".text-sm",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "font-size",
+					"value": "var(--text-sm)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "line-height",
+					"value": "var(--tw-leading, var(--text-sm--line-height))",
+					"important": false
+				}
+			]
+		}
+	],
+	"bg-red-500": [
+		{
+			"kind": "rule",
+			"selector": ".bg-red-500",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "background-color",
+					"value": "var(--color-red-500)",
+					"important": false
+				}
+			]
+		}
+	],
+	"p-2": [
+		{
+			"kind": "rule",
+			"selector": ".p-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "padding",
+					"value": "calc(var(--spacing) * 2)",
+					"important": false
+				}
+			]
+		}
+	],
+	"bg-blue-500": [
+		{
+			"kind": "rule",
+			"selector": ".bg-blue-500",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "background-color",
+					"value": "var(--color-blue-500)",
+					"important": false
+				}
+			]
+		}
+	],
+	"flex": [
+		{
+			"kind": "rule",
+			"selector": ".flex",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "display",
+					"value": "flex",
+					"important": false
+				}
+			]
+		}
+	],
+	"items-center": [
+		{
+			"kind": "rule",
+			"selector": ".items-center",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "align-items",
+					"value": "center",
+					"important": false
+				}
+			]
+		}
+	],
+	"rounded-md": [
+		{
+			"kind": "rule",
+			"selector": ".rounded-md",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "border-radius",
+					"value": "var(--radius-md)",
+					"important": false
+				}
+			]
+		}
+	],
+	"font-medium": [
+		{
+			"kind": "rule",
+			"selector": ".font-medium",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-font-weight",
+					"value": "var(--font-weight-medium)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "font-weight",
+					"value": "var(--font-weight-medium)",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-font-weight",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"font-normal!": [
+		{
+			"kind": "rule",
+			"selector": ".font-normal\\!",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-font-weight",
+					"value": "var(--font-weight-normal)",
+					"important": true
+				},
+				{
+					"kind": "declaration",
+					"property": "font-weight",
+					"value": "var(--font-weight-normal)",
+					"important": true
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-font-weight",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"font-medium!": [
+		{
+			"kind": "rule",
+			"selector": ".font-medium\\!",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-font-weight",
+					"value": "var(--font-weight-medium)",
+					"important": true
+				},
+				{
+					"kind": "declaration",
+					"property": "font-weight",
+					"value": "var(--font-weight-medium)",
+					"important": true
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-font-weight",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"p-4": [
+		{
+			"kind": "rule",
+			"selector": ".p-4",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "padding",
+					"value": "calc(var(--spacing) * 4)",
+					"important": false
+				}
+			]
+		}
+	],
+	"md:p-4": [
+		{
+			"kind": "rule",
+			"selector": ".md\\:p-4",
+			"nodes": [
+				{
+					"kind": "at-rule",
+					"name": "@media",
+					"params": "(width >= 48rem)",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "padding",
+							"value": "calc(var(--spacing) * 4)",
+							"important": false
+						}
+					]
+				}
+			]
+		}
+	],
+	"md:p-2": [
+		{
+			"kind": "rule",
+			"selector": ".md\\:p-2",
+			"nodes": [
+				{
+					"kind": "at-rule",
+					"name": "@media",
+					"params": "(width >= 48rem)",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "padding",
+							"value": "calc(var(--spacing) * 2)",
+							"important": false
+						}
+					]
+				}
+			]
+		}
+	],
+	"hover:md:p-2": [
+		{
+			"kind": "rule",
+			"selector": ".hover\\:md\\:p-2",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&:hover",
+					"nodes": [
+						{
+							"kind": "at-rule",
+							"name": "@media",
+							"params": "(hover: hover)",
+							"nodes": [
+								{
+									"kind": "at-rule",
+									"name": "@media",
+									"params": "(width >= 48rem)",
+									"nodes": [
+										{
+											"kind": "declaration",
+											"property": "padding",
+											"value": "calc(var(--spacing) * 2)",
+											"important": false
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"md:hover:p-4": [
+		{
+			"kind": "rule",
+			"selector": ".md\\:hover\\:p-4",
+			"nodes": [
+				{
+					"kind": "at-rule",
+					"name": "@media",
+					"params": "(width >= 48rem)",
+					"nodes": [
+						{
+							"kind": "rule",
+							"selector": "&:hover",
+							"nodes": [
+								{
+									"kind": "at-rule",
+									"name": "@media",
+									"params": "(hover: hover)",
+									"nodes": [
+										{
+											"kind": "declaration",
+											"property": "padding",
+											"value": "calc(var(--spacing) * 4)",
+											"important": false
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"before:hover:m-1": [
+		{
+			"kind": "rule",
+			"selector": ".before\\:hover\\:m-1",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&::before",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "content",
+							"value": "var(--tw-content)",
+							"important": false
+						},
+						{
+							"kind": "rule",
+							"selector": "&:hover",
+							"nodes": [
+								{
+									"kind": "at-rule",
+									"name": "@media",
+									"params": "(hover: hover)",
+									"nodes": [
+										{
+											"kind": "declaration",
+											"property": "margin",
+											"value": "var(--spacing)",
+											"important": false
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-content",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "\"\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"hover:before:m-2": [
+		{
+			"kind": "rule",
+			"selector": ".hover\\:before\\:m-2",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&:hover",
+					"nodes": [
+						{
+							"kind": "at-rule",
+							"name": "@media",
+							"params": "(hover: hover)",
+							"nodes": [
+								{
+									"kind": "rule",
+									"selector": "&::before",
+									"nodes": [
+										{
+											"kind": "declaration",
+											"property": "content",
+											"value": "var(--tw-content)",
+											"important": false
+										},
+										{
+											"kind": "declaration",
+											"property": "margin",
+											"value": "calc(var(--spacing) * 2)",
+											"important": false
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-content",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "\"\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"before:focus:underline": [
+		{
+			"kind": "rule",
+			"selector": ".before\\:focus\\:underline",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&::before",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "content",
+							"value": "var(--tw-content)",
+							"important": false
+						},
+						{
+							"kind": "rule",
+							"selector": "&:focus",
+							"nodes": [
+								{
+									"kind": "declaration",
+									"property": "text-decoration-line",
+									"value": "underline",
+									"important": false
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-content",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "\"\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"before:focus:no-underline": [
+		{
+			"kind": "rule",
+			"selector": ".before\\:focus\\:no-underline",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&::before",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "content",
+							"value": "var(--tw-content)",
+							"important": false
+						},
+						{
+							"kind": "rule",
+							"selector": "&:focus",
+							"nodes": [
+								{
+									"kind": "declaration",
+									"property": "text-decoration-line",
+									"value": "none",
+									"important": false
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-content",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "\"\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"focus:before:no-underline": [
+		{
+			"kind": "rule",
+			"selector": ".focus\\:before\\:no-underline",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&:focus",
+					"nodes": [
+						{
+							"kind": "rule",
+							"selector": "&::before",
+							"nodes": [
+								{
+									"kind": "declaration",
+									"property": "content",
+									"value": "var(--tw-content)",
+									"important": false
+								},
+								{
+									"kind": "declaration",
+									"property": "text-decoration-line",
+									"value": "none",
+									"important": false
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-content",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "\"\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"scroll-mt-2": [
+		{
+			"kind": "rule",
+			"selector": ".scroll-mt-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "scroll-margin-top",
+					"value": "calc(var(--spacing) * 2)",
+					"important": false
+				}
+			]
+		}
+	],
+	"scroll-m-4": [
+		{
+			"kind": "rule",
+			"selector": ".scroll-m-4",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "scroll-margin",
+					"value": "calc(var(--spacing) * 4)",
+					"important": false
+				}
+			]
+		}
+	],
+	"border-grid": [
+		{
+			"kind": "rule",
+			"selector": ".border-grid",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "border",
+					"value": "1px solid red",
+					"important": false
+				}
+			]
+		}
+	],
+	"border-red-500": [
+		{
+			"kind": "rule",
+			"selector": ".border-red-500",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "border-color",
+					"value": "var(--color-red-500)",
+					"important": false
+				}
+			]
+		}
+	],
+	"leading-snug": [
+		{
+			"kind": "rule",
+			"selector": ".leading-snug",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-leading",
+					"value": "var(--leading-snug)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "line-height",
+					"value": "var(--leading-snug)",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-leading",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"text-xs": [
+		{
+			"kind": "rule",
+			"selector": ".text-xs",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "font-size",
+					"value": "var(--text-xs)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "line-height",
+					"value": "var(--tw-leading, var(--text-xs--line-height))",
+					"important": false
+				}
+			]
+		}
+	],
+	"leading-tight": [
+		{
+			"kind": "rule",
+			"selector": ".leading-tight",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-leading",
+					"value": "var(--leading-tight)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "line-height",
+					"value": "var(--leading-tight)",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-leading",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"ordinal": [
+		{
+			"kind": "rule",
+			"selector": ".ordinal",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-ordinal",
+					"value": "ordinal",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "font-variant-numeric",
+					"value": "var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,)",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ordinal",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-slashed-zero",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-numeric-figure",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-numeric-spacing",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-numeric-fraction",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"slashed-zero": [
+		{
+			"kind": "rule",
+			"selector": ".slashed-zero",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-slashed-zero",
+					"value": "slashed-zero",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "font-variant-numeric",
+					"value": "var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,)",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ordinal",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-slashed-zero",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-numeric-figure",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-numeric-spacing",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-numeric-fraction",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		}
+	],
+	"focus-visible:ring-red-500/50": [
+		{
+			"kind": "rule",
+			"selector": ".focus-visible\\:ring-red-500\\/50",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&:focus-visible",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "--tw-ring-color",
+							"value": "color-mix(in oklab, var(--color-red-500) 50%, transparent)",
+							"important": false
+						}
+					]
+				}
+			]
+		}
+	],
+	"[font-weight:900]": [
+		{
+			"kind": "rule",
+			"selector": ".\\[font-weight\\:900\\]",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "font-weight",
+					"value": "900",
+					"important": false
+				}
+			]
+		}
+	],
+	"translate-x-2": [
+		{
+			"kind": "rule",
+			"selector": ".translate-x-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-translate-x",
+					"value": "calc(var(--spacing) * 2)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "translate",
+					"value": "var(--tw-translate-x) var(--tw-translate-y)",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-translate-x",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-translate-y",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-translate-z",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0",
+					"important": false
+				}
+			]
+		}
+	],
+	"translate-none": [
+		{
+			"kind": "rule",
+			"selector": ".translate-none",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "translate",
+					"value": "none",
+					"important": false
+				}
+			]
+		}
+	],
+	"normal-nums": [
+		{
+			"kind": "rule",
+			"selector": ".normal-nums",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "font-variant-numeric",
+					"value": "normal",
+					"important": false
+				}
+			]
+		}
+	],
+	"ring-2": [
+		{
+			"kind": "rule",
+			"selector": ".ring-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-ring-shadow",
+					"value": "var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "box-shadow",
+					"value": "var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow-alpha",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<percentage>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "100%",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow-alpha",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<percentage>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "100%",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-ring-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-ring-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-inset",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-width",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<length>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0px",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "#fff",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		}
+	],
+	"shadow-lg": [
+		{
+			"kind": "rule",
+			"selector": ".shadow-lg",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-shadow",
+					"value": "0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1))",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "box-shadow",
+					"value": "var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow-alpha",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<percentage>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "100%",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow-alpha",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<percentage>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "100%",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-ring-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-ring-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-inset",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-width",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<length>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0px",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "#fff",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		}
+	],
+	"ring-red-500/50": [
+		{
+			"kind": "rule",
+			"selector": ".ring-red-500\\/50",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--tw-ring-color",
+					"value": "color-mix(in oklab, var(--color-red-500) 50%, transparent)",
+					"important": false
+				}
+			]
+		}
+	],
+	"focus-visible:ring-[3px]": [
+		{
+			"kind": "rule",
+			"selector": ".focus-visible\\:ring-\\[3px\\]",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&:focus-visible",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "--tw-ring-shadow",
+							"value": "var(--tw-ring-inset,) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor)",
+							"important": false
+						},
+						{
+							"kind": "declaration",
+							"property": "box-shadow",
+							"value": "var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)",
+							"important": false
+						}
+					]
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-shadow-alpha",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<percentage>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "100%",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-shadow-alpha",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<percentage>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "100%",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-ring-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-inset-ring-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-inset",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-width",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"<length>\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0px",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-color",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "#fff",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-ring-offset-shadow",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "0 0 #0000",
+					"important": false
+				}
+			]
+		}
+	],
+	"aria-invalid:ring-red-500/20": [
+		{
+			"kind": "rule",
+			"selector": ".aria-invalid\\:ring-red-500\\/20",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&[aria-invalid=\"true\"]",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "--tw-ring-color",
+							"value": "color-mix(in oklab, var(--color-red-500) 20%, transparent)",
+							"important": false
+						}
+					]
+				}
+			]
+		}
+	],
+	"text-lg/7": [
+		{
+			"kind": "rule",
+			"selector": ".text-lg\\/7",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "font-size",
+					"value": "var(--text-lg)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "line-height",
+					"value": "calc(var(--spacing) * 7)",
+					"important": false
+				}
+			]
+		}
+	],
+	"line-clamp-2": [
+		{
+			"kind": "rule",
+			"selector": ".line-clamp-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "overflow",
+					"value": "hidden",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "display",
+					"value": "-webkit-box",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "-webkit-box-orient",
+					"value": "vertical",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "-webkit-line-clamp",
+					"value": "2",
+					"important": false
+				}
+			]
+		}
+	],
+	"[&>svg]:size-4": [
+		{
+			"kind": "rule",
+			"selector": ".\\[\\&\\>svg\\]\\:size-4",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&>svg",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "width",
+							"value": "calc(var(--spacing) * 4)",
+							"important": false
+						},
+						{
+							"kind": "declaration",
+							"property": "height",
+							"value": "calc(var(--spacing) * 4)",
+							"important": false
+						}
+					]
+				}
+			]
+		}
+	],
+	"[&>svg]:size-5": [
+		{
+			"kind": "rule",
+			"selector": ".\\[\\&\\>svg\\]\\:size-5",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&>svg",
+					"nodes": [
+						{
+							"kind": "declaration",
+							"property": "width",
+							"value": "calc(var(--spacing) * 5)",
+							"important": false
+						},
+						{
+							"kind": "declaration",
+							"property": "height",
+							"value": "calc(var(--spacing) * 5)",
+							"important": false
+						}
+					]
+				}
+			]
+		}
+	],
+	"[&>svg]:hover:size-4": [
+		{
+			"kind": "rule",
+			"selector": ".\\[\\&\\>svg\\]\\:hover\\:size-4",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&>svg",
+					"nodes": [
+						{
+							"kind": "rule",
+							"selector": "&:hover",
+							"nodes": [
+								{
+									"kind": "at-rule",
+									"name": "@media",
+									"params": "(hover: hover)",
+									"nodes": [
+										{
+											"kind": "declaration",
+											"property": "width",
+											"value": "calc(var(--spacing) * 4)",
+											"important": false
+										},
+										{
+											"kind": "declaration",
+											"property": "height",
+											"value": "calc(var(--spacing) * 4)",
+											"important": false
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"hover:[&>svg]:size-5": [
+		{
+			"kind": "rule",
+			"selector": ".hover\\:\\[\\&\\>svg\\]\\:size-5",
+			"nodes": [
+				{
+					"kind": "rule",
+					"selector": "&:hover",
+					"nodes": [
+						{
+							"kind": "at-rule",
+							"name": "@media",
+							"params": "(hover: hover)",
+							"nodes": [
+								{
+									"kind": "rule",
+									"selector": "&>svg",
+									"nodes": [
+										{
+											"kind": "declaration",
+											"property": "width",
+											"value": "calc(var(--spacing) * 5)",
+											"important": false
+										},
+										{
+											"kind": "declaration",
+											"property": "height",
+											"value": "calc(var(--spacing) * 5)",
+											"important": false
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"[padding:1rem]": [
+		{
+			"kind": "rule",
+			"selector": ".\\[padding\\:1rem\\]",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "padding",
+					"value": "1rem",
+					"important": false
+				}
+			]
+		}
+	],
+	"[--cell-size:3rem]": [
+		{
+			"kind": "rule",
+			"selector": ".\\[--cell-size\\:3rem\\]",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "--cell-size",
+					"value": "3rem",
+					"important": false
+				}
+			]
+		}
+	],
+	"text-xsm": [],
+	"not-a-class": [],
+	"also-not-one": [],
+	"btn": []
+}
