@@ -35,6 +35,10 @@
 			"types": "./dist/css.d.ts",
 			"default": "./dist/css.js"
 		},
+		"./css/node": {
+			"types": "./dist/css-node.d.ts",
+			"default": "./dist/css-node.js"
+		},
 		"./parse": {
 			"types": "./dist/parse.d.ts",
 			"default": "./dist/parse.js"

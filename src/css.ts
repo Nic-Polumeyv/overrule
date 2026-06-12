@@ -12,24 +12,12 @@ export type { Oracle } from './oracle.js';
  * construction, and tokens that feed surviving var() references (leading-*
  * into text-*, ring-* into shadow-*) are composing, not losing.
  *
- * Node-only for now: loading the design system goes through
- * `@tailwindcss/node` so imports, plugins, and configs resolve like they do
- * in your build.
- *
- *   const oracle = await createCssOracle({ css: readFileSync('src/app.css', 'utf8'), base: 'src' });
- *   assertVariantsMergeFree(buttonVariants, axes, oracle);
+ * This module is platform-neutral on purpose, like the runtime API: no Node,
+ * no filesystem, nothing but the design system you hand it. Load that design
+ * system however your environment allows. On Node, `overrule/css/node` does
+ * it for you; anywhere else, Tailwind's own `__unstable__loadDesignSystem`
+ * from the `tailwindcss` package takes your stylesheet as text.
  */
-
-export type CssOracleOptions = {
-	/**
-	 * CSS entry to compile against. Defaults to a bare `@import "tailwindcss"`,
-	 * which knows nothing about your theme or custom utilities. Point it at
-	 * your real entry for the full truth.
-	 */
-	css?: string;
-	/** Directory for resolving imports, plugins, and configs. Defaults to process.cwd(). */
-	base?: string;
-};
 
 type AstNode = {
 	kind: string;
@@ -42,7 +30,11 @@ type AstNode = {
 	nodes?: AstNode[];
 };
 
-type DesignSystemLike = { candidatesToAst(classes: string[]): AstNode[][] };
+/**
+ * The slice of Tailwind's design system the oracle needs: candidatesToAst,
+ * available since tailwindcss 4.2.
+ */
+export type DesignSystemLike = { candidatesToAst(classes: string[]): AstNode[][] };
 
 type Decl = {
 	/** Variant bucket plus importance. Declarations only contest within a bucket. */
@@ -80,16 +72,27 @@ function collect(nodes: AstNode[], conditions: string[], candidate: string, out:
 }
 
 /**
- * Pseudo-element selectors are the only conditions where nesting order
- * styles a different box. Everything else (media queries, pseudo-classes,
- * attribute selectors) commutes, so it sorts into a canonical order. Same
- * reasoning as bucketOf in parse.ts, applied to compiled output.
+ * Conditions commute when they constrain the same element: media queries and
+ * plain pseudo-class or attribute selectors on &. A condition that reaches a
+ * different box (a pseudo-element, or any selector with a combinator) makes
+ * everything nested inside it apply there, so its position pins the stretch
+ * boundaries and each stretch sorts on its own. Same reasoning as bucketOf
+ * in parse.ts, applied to compiled output.
  */
 function bucketOf(conditions: string[], important: boolean): string {
-	const sensitive = (condition: string) => condition.includes('::');
-	const sortable = conditions.filter((condition) => !sensitive(condition)).sort();
-	let next = 0;
-	const normalized = conditions.map((condition) => (sensitive(condition) ? condition : sortable[next++]));
+	const sensitive = (condition: string) =>
+		!condition.startsWith('@') && (condition.includes('::') || /[\s>+~]/.test(condition));
+	const normalized: string[] = [];
+	let segment: string[] = [];
+	for (const condition of conditions) {
+		if (sensitive(condition)) {
+			normalized.push(...segment.sort(), condition);
+			segment = [];
+		} else {
+			segment.push(condition);
+		}
+	}
+	normalized.push(...segment.sort());
 	return normalized.join(' ') + (important ? ' !' : '');
 }
 
@@ -103,7 +106,7 @@ const COVERED_BY: Record<string, string[]> = {};
 function covered(child: string, ...parents: string[]): void {
 	COVERED_BY[child] = parents;
 }
-for (const box of ['padding', 'margin']) {
+for (const box of ['padding', 'margin', 'scroll-padding', 'scroll-margin']) {
 	for (const side of ['top', 'right', 'bottom', 'left', 'inline', 'block']) covered(`${box}-${side}`, box);
 	for (const axis of ['inline', 'block']) {
 		covered(`${box}-${axis}-start`, `${box}-${axis}`, box);
@@ -128,6 +131,8 @@ for (const corner of ['top-left', 'top-right', 'bottom-left', 'bottom-right', 's
 }
 covered('row-gap', 'gap');
 covered('column-gap', 'gap');
+covered('container-name', 'container');
+covered('container-type', 'container');
 covered('overflow-x', 'overflow');
 covered('overflow-y', 'overflow');
 covered('overscroll-behavior-x', 'overscroll-behavior');
@@ -183,27 +188,15 @@ function declsOf(candidate: string, roots: AstNode[]): Decl[] | null {
 const VAR_RE = /var\(\s*(--[^\s,)]+)/g;
 
 /**
- * Build an oracle from the project's compiled CSS. Async because loading the
- * design system resolves files; the oracle it returns is synchronous and
- * caches per token, so guard() and the test helpers use it unchanged.
+ * Build an oracle from a loaded design system. Synchronous and cached per
+ * token, so guard() and the test helpers use it unchanged.
  *
  * Tokens the compiler does not recognize produce no CSS and are skipped, not
  * reported. Surfacing them as typos is on the roadmap.
  */
-export async function createCssOracle(options: CssOracleOptions = {}): Promise<Oracle> {
-	let mod: typeof import('@tailwindcss/node');
-	try {
-		mod = await import('@tailwindcss/node');
-	} catch {
-		throw new Error(
-			'createCssOracle compiles your classes with Tailwind itself. Install tailwindcss and @tailwindcss/node, both 4.2 or newer.',
-		);
-	}
-	const ds = (await mod.__unstable__loadDesignSystem(options.css ?? '@import "tailwindcss";', {
-		base: options.base ?? process.cwd(),
-	})) as unknown as DesignSystemLike;
-	if (typeof ds.candidatesToAst !== 'function') {
-		throw new Error('createCssOracle needs tailwindcss 4.2 or newer, the first version that exposes candidatesToAst.');
+export function cssOracle(designSystem: DesignSystemLike): Oracle {
+	if (typeof designSystem?.candidatesToAst !== 'function') {
+		throw new Error('cssOracle needs a design system with candidatesToAst, which tailwindcss exposes from 4.2 on.');
 	}
 
 	const cache = new Map<string, Decl[] | null>();
@@ -215,7 +208,7 @@ export async function createCssOracle(options: CssOracleOptions = {}): Promise<O
 
 		const missing = tokens.filter((token) => !cache.has(token));
 		if (missing.length > 0) {
-			const asts = ds.candidatesToAst(missing);
+			const asts = designSystem.candidatesToAst(missing);
 			missing.forEach((token, i) => cache.set(token, declsOf(token, asts[i] ?? [])));
 		}
 		const known = tokens.filter((token) => cache.get(token) != null);
