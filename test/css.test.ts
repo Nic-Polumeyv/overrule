@@ -1,17 +1,20 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { cssOracle } from '../src/css.js';
-import { createCssOracle } from '../src/css-node.js';
+import { cssOracle, typoOracle } from '../src/css.js';
+import { createCssOracle, loadDesignSystem } from '../src/css-node.js';
 import type { Oracle } from '../src/index.js';
 
 let oracle: Oracle;
+let typos: Oracle;
 let prefixed: Oracle;
 
 beforeAll(async () => {
-	oracle = await createCssOracle({
+	const designSystem = await loadDesignSystem({
 		css: '@import "tailwindcss"; @utility border-grid { border: 1px solid red; }',
 		base: process.cwd(),
 	});
+	oracle = cssOracle(designSystem);
+	typos = typoOracle(designSystem);
 	prefixed = await createCssOracle({ css: '@import "tailwindcss" prefix(tw);', base: process.cwd() });
 });
 
@@ -132,6 +135,13 @@ describe('createCssOracle', () => {
 describe('cssOracle', () => {
 	test('rejects anything without candidatesToAst', () => {
 		expect(() => cssOracle({} as never)).toThrow('candidatesToAst');
+	});
+});
+
+describe('typoOracle', () => {
+	test('reports tokens that compile to nothing, custom utilities count as known', () => {
+		expect(typos('p-4 text-xsm btn')).toEqual(['text-xsm', 'btn']);
+		expect(typos('flex h-9 border-grid')).toEqual([]);
 	});
 });
 

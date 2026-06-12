@@ -188,6 +188,27 @@ function declsOf(candidate: string, roots: AstNode[]): Decl[] | null {
 }
 
 /**
+ * An oracle that reports tokens that compile to nothing: not conflicts, not
+ * classes either. Typos, usually. Classes defined outside Tailwind land here
+ * too, so treat the report as a lead, not a verdict.
+ */
+export function typoOracle(designSystem: DesignSystemLike): Oracle {
+	if (typeof designSystem?.candidatesToAst !== 'function') {
+		throw new Error('typoOracle needs a design system with candidatesToAst, which tailwindcss exposes from 4.2 on.');
+	}
+	const known = new Map<string, boolean>();
+	return (classes) => {
+		const tokens = [...new Set(classes.split(/\s+/).filter(Boolean))];
+		const missing = tokens.filter((token) => !known.has(token));
+		if (missing.length > 0) {
+			const asts = designSystem.candidatesToAst(missing);
+			missing.forEach((token, i) => known.set(token, (asts[i] ?? []).length > 0));
+		}
+		return tokens.filter((token) => !known.get(token));
+	};
+}
+
+/**
  * Build an oracle from a loaded design system. Synchronous and cached per
  * token, so guard() and the test helpers use it unchanged.
  *

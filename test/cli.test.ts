@@ -3,6 +3,7 @@ import { mkdtempSync, cpSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import { twMerge } from 'tailwind-merge';
+import type { Oracle } from '../src/index.js';
 import { applyFixes, scanPaths, scanSource } from '../src/scan.js';
 
 const FIXTURES = new URL('./fixtures', import.meta.url).pathname;
@@ -25,6 +26,14 @@ describe('scanSource', () => {
 	test('line numbers point at the literal', () => {
 		const findings = scanSource('a\nb\n<div class="p-1 p-2">');
 		expect(findings[0].line).toBe(3);
+	});
+	test('a custom oracle threads through, fixed included', () => {
+		const fake: Oracle = (classes) => classes.split(/\s+/).filter((token) => token === 'loser');
+		const findings = scanSource('<div class="a loser b">', fake);
+		expect(findings).toHaveLength(1);
+		expect(findings[0].dropped).toEqual(['loser']);
+		expect(findings[0].fixed).toBe('a b');
+		expect(scanSource('<div class="h-9 h-8">', fake)).toHaveLength(0);
 	});
 });
 

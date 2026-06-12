@@ -21,7 +21,8 @@ export type CssOracleOptions = {
 	base?: string;
 };
 
-export async function createCssOracle(options: CssOracleOptions = {}): Promise<Oracle> {
+/** Load a design system to share between cssOracle and typoOracle. */
+export async function loadDesignSystem(options: CssOracleOptions = {}): Promise<DesignSystemLike> {
 	let mod: typeof import('@tailwindcss/node');
 	try {
 		mod = await import('@tailwindcss/node');
@@ -30,8 +31,11 @@ export async function createCssOracle(options: CssOracleOptions = {}): Promise<O
 			'createCssOracle compiles your classes with Tailwind itself. Install tailwindcss and @tailwindcss/node, both 4.2 or newer.',
 		);
 	}
-	const designSystem = (await mod.__unstable__loadDesignSystem(options.css ?? '@import "tailwindcss";', {
+	return (await mod.__unstable__loadDesignSystem(options.css ?? '@import "tailwindcss";', {
 		base: options.base ?? process.cwd(),
 	})) as unknown as DesignSystemLike;
-	return cssOracle(designSystem);
+}
+
+export async function createCssOracle(options: CssOracleOptions = {}): Promise<Oracle> {
+	return cssOracle(await loadDesignSystem(options));
 }
