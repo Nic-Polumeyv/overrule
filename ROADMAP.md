@@ -2,28 +2,20 @@
 
 What overrule is moving toward, in version order. Dates are not promises.
 
-## 0.2.x, hardening
+## 0.3.x, hardening the oracle
 
-Small releases driven by real use.
+0.3.0 shipped the stylesheet-derived oracle. `createCssOracle` compiles candidates with Tailwind v4's own design system and judges by the declarations they actually produce: no name heuristics, no tables to maintain, custom utilities first class by construction. `overrule cross` prints every place the compiled CSS and tailwind-merge's tables disagree, and `--css` swaps the oracle under `check` and `fix`. Tokens that compile to nothing get reported as the typos they usually are. What is left in this line:
 
-- **Node job in CI.** The test suite runs under bun, but the CLI's contract is npx on Node. CI should run `node dist/cli.js check test/fixtures` against a build on every push so that promise is checked by a machine, not by memory.
 - **CI-friendly check output.** A `--json` flag for tooling, and GitHub Actions annotations (`::error file=...,line=...`) so `overrule check` failures show up inline on pull requests instead of buried in a log.
-- **Export the tokenizer as `overrule/parse`.** The class tokenizer (variants, importance in both syntaxes, arbitrary values that survive nested brackets and quotes, order-normalized bucket keys) ships in the package but is not exported yet. It is useful on its own and it is the foundation the 0.3.0 oracle builds on.
-- **Whatever dogfooding finds.** The package came out of a production monorepo migration; adopting the published package back into that monorepo (guard in the component library, the variants assertion in its test suite, `overrule check` in CI) will surface API friction before strangers hit it.
-
-## 0.3.0, the stylesheet-derived oracle
-
-The headline. tailwind-merge classifies classes by name, which is why it silently deletes custom utilities it mis-classifies. The project's compiled CSS already knows the truth about every class, custom utilities included.
-
-- **`createCssOracle()`** built on Tailwind v4's compile API: feed it the candidate classes, read back which declarations each one actually produces. Two tokens conflict when they declare the same properties in the same variant bucket. No name heuristics, no tables to maintain, correct for any Tailwind version and any custom utility by construction.
-- **Cross-check mode.** Run both oracles and report disagreements. Every disagreement is either a bug here or a tailwind-merge misclassification worth reporting upstream with a reproduction.
-- **Typo detection for free.** A token that compiles to nothing is not a class. Neither tailwind-merge nor anything else in this niche catches misspelled utilities; an oracle that reads the compiler's output gets this as a side effect.
-- Open questions to settle during the work: batching candidates through the compile API so large codebases stay fast, and what counts as "the same condition" when variants compile to media queries versus selectors.
+- **Acknowledged divergences.** `cross` exits 0 today because some disagreements are permanent and correct (the tables kill tokens that v4 composes through custom properties). A way to acknowledge the known ones turns `cross` into a CI gate that fails only on NEW disagreements.
+- **Single-token literals.** The scanner skips them so `cn('active')` does not get flagged, which also hides single-token typos from the unknown-class report. Needs a decision, not just code.
+- **Whatever dogfooding finds.** The first soak is done: seven production apps plus their component library, full agreement except one true positive. The next ones run continuously.
 
 ## 0.4.0, adoption surface
 
 - **Per-framework wiring recipes** in the docs: the exact `guard` setup for SvelteKit, Next, Vite-anything, including the dev-flag idiom for each bundler. Recipes over plugins; a plugin is a maintenance surface a paragraph can replace.
-- Revisit that choice only if the recipes turn out to be genuinely error-prone in practice.
+- **The browser recipe for the css oracle.** `overrule/css` imports nothing on purpose; feed it a design system loaded from your stylesheet text (`?inline` in Vite) and the guard judges with your real CSS in the browser, in dev only.
+- Revisit the no-plugin choice only if the recipes turn out to be genuinely error-prone in practice.
 
 ## 1.0.0
 

@@ -55,7 +55,29 @@ npx overrule check src/   # report conflicts inside class literals, exit 1 if an
 npx overrule fix src/     # rewrite each one to its merged form
 ```
 
-`fix` writes exactly what tailwind-merge already resolved the string to, so it cannot change a pixel. `check` belongs in CI. The CLI sees one literal at a time; conflicts between a caller and a component's internals only exist at runtime, which is what the guard is for.
+`fix` writes the same survivors tailwind-merge keeps, so it cannot change a pixel. `check` belongs in CI. The CLI sees one literal at a time; conflicts between a caller and a component's internals only exist at runtime, which is what the guard is for.
+
+## The stylesheet oracle
+
+tailwind-merge classifies classes by name. That is how a custom `border-grid` utility gets read as a border color and deleted. Your compiled CSS already knows the truth about every class, custom utilities included, and overrule can judge with that instead:
+
+```bash
+npx overrule check src/ --css src/app.css   # judge with your stylesheet, not the tables
+npx overrule cross src/ --css src/app.css   # print every case where the two disagree
+```
+
+Point `--css` at the entry that imports tailwindcss. Your theme, custom utilities, and prefix all count, and tokens that compile to nothing get reported as the typos they usually are. Run `cross` on your codebase and every line of output is either a bug to file here or a tailwind-merge misclassification with a reproduction attached.
+
+The same oracle plugs into the guard and the test assertion:
+
+```ts
+import { createCssOracle } from 'overrule/css/node';
+
+const oracle = await createCssOracle({ css: readFileSync('src/app.css', 'utf8'), base: 'src' });
+assertVariantsMergeFree(buttonVariants, axes, oracle);
+```
+
+`overrule/css` holds the judging logic and imports nothing, so it runs anywhere; `overrule/css/node` is the loader. Both need tailwindcss and @tailwindcss/node installed, 4.2 or newer.
 
 ## The tokenizer
 
@@ -74,7 +96,7 @@ parse('md:hover:p-4!');
 // }
 ```
 
-It never guesses what a utility means. That job belongs to the oracle, and the stylesheet-derived oracle on the roadmap builds on these buckets.
+It never guesses what a utility means. That job belongs to the oracle.
 
 ## When the caller should win
 
@@ -89,6 +111,8 @@ Overruled. Tailwind's important modifier is native, deterministic, and invisible
 ## Does it work
 
 overrule came out of deleting tailwind-merge from a production monorepo: seven SvelteKit apps, 233 call sites converted with pixel-identical output, roughly 25KB of minified JavaScript dropped per app. The first time the CLI ran against that codebase, after the migration was supposedly done, it caught two more conflicts on pages nobody had rendered in dev.
+
+Running `cross` back over the same monorepo with each app's real stylesheet: the two oracles agree on everything except one string. The one is a bare `filter` sitting next to `blur-[10px] invert`, dead weight the tables cannot see, because every filter utility restates the whole filter chain.
 
 ## Prior art
 
