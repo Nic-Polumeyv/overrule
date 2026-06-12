@@ -10,17 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
       - uses: oven-sh/setup-bun@v2
+      # tailwindcss for the cross end-to-end test; the bridge resolves it
+      # from the repo root at runtime.
       - run: bun install --frozen-lockfile
-      - run: bun test
-      - run: bun run build
-      - name: cli contract under node
-        run: |
-          node dist/cli.js check src
-          set +e
-          out=$(env -u GITHUB_ACTIONS node dist/cli.js check test/fixtures)
-          code=$?
-          set -e
-          echo "$out"
-          test "$code" -eq 1
-          echo "$out" | grep -q "conflicting class strings"
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test

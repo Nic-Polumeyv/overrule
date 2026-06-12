@@ -1,122 +1,77 @@
 # overrule
 
-tailwind-merge as a dev tool, not a dependency.
+tailwind-merge as a dev tool, not a dependency. The CLI is Rust now.
 
-Somewhere in your bundle right now, tailwind-merge is re-litigating an argument you settled the day you wrote the code: `h-9` or `h-8`? It runs on every render, on every one of your users' devices, and it usually picks the right winner. Usually. It also deletes custom utilities it mis-classifies (a custom `border-grid` utility reads as a border color and silently vanishes when a real one shows up), and it takes innocent bystanders with it (a later `text-xs` removes `leading-snug`, because font size conflicts with line height).
+`check` reports class strings whose tokens fight and exits 1. `fix` rewrites each one to the form the merge would have produced, so it cannot change a pixel. `cross` compares the name tables against your compiled stylesheet and prints every disagreement. Same contract as the 0.3.x npm CLI, byte for byte where the engines agree: same text output, same JSON shapes, same exit codes, and ack snapshots interop both ways.
 
-Here's the thing: class conflicts are not a runtime problem. CSS ignores the order of your class attribute, so when two classes set the same property, stylesheet order picks the winner. That is a coin flip, and tailwind-merge exists to rig it. But you wrote the conflict once. Resolve it once, in source, and demote tailwind-merge to the job it is genuinely great at: checking your work.
+The runtime half still ships from npm: `guard`, `join`, and the `overrule/test` assertions run inside your dev bundle, and that is JavaScript's turf. Their source lives at the [v0.3.1 tag](https://github.com/Nic-Polumeyv/overrule/tree/v0.3.1).
 
-overrule is the safety net that makes turning the merge off survivable: a dev guard, a test assertion, and a codemod. Production ships none of them.
-
-## Install
+## Build and run
 
 ```bash
-bun add -d overrule
-# or
-npm i -D overrule
+cargo build --release
+target/release/overrule check src/
+target/release/overrule fix src/
+target/release/overrule check src/ --css src/app.css   # judge with your stylesheet
+target/release/overrule cross src/ --css src/app.css   # tables vs stylesheet
+target/release/overrule cross src/ --ack acks.json     # CI gate: new disagreements only
 ```
 
-## The guard
+`--css` and `cross` compile your classes with Tailwind itself, so they need node plus tailwindcss and @tailwindcss/node, 4.2 or newer, reachable from the CSS entry's project or from the directory you run in. Plain `check` and `fix` need nothing.
 
-Wrap whatever function builds your class strings. In dev it warns the moment a rendered string contains a conflict. In production it does not exist, and neither does tailwind-merge.
+## What moved, what stayed
 
-```ts
-import { guard, join } from 'overrule';
+| v0.3.1 | now | notes |
+| --- | --- | --- |
+| src/parse.ts | src/parse.rs | direct port |
+| src/oracle.ts | src/oracle.rs | tailwind-fuse plays tailwind-merge, see below |
+| src/scan.ts | src/scan.rs | direct port, plus rayon: files are judged in parallel |
+| src/css.ts | src/css.rs | direct port of the judging logic, pure like the original |
+| src/css-node.ts | src/bridge.rs + bridge/dump-asts.mjs | see below |
+| src/cli.ts | src/main.rs | check, fix, cross, --css, --json, --ack, annotations |
+| join, guard, overrule/test | the npm package | they ship in consumers' dev bundles and stay JavaScript |
 
-export const cn = import.meta.env.DEV ? guard(join) : join;
-```
+## The two design calls
 
-```
-[overrule] "h-9" conflicts with other classes in "inline-flex h-9 px-2 h-8".
-The cascade decides which wins. Make precedence explicit (trailing !) or remove the loser.
-```
+**tailwind-fuse instead of tailwind-merge.** The tables side needs a merge engine and tailwind-merge is JavaScript. tailwind-fuse is the Rust port of it, so it slots into the same seam. But its tables lag: it cannot tell ring color from ring width through an arbitrary value, so `focus-visible:ring-ring/50 ... focus-visible:ring-[3px]` (the shadcn focus ring) false-flags, and it lumps v4's `bg-size-[...]` and `bg-position-[...]` together. It also only parses the v3 leading `!`, so the oracle rewrites `font-normal!` to `!font-normal` before judging to keep important and normal classes out of each other's way. None of this is fixable here without forking the crate. It is the same lesson this tool is built on: name tables drift, and `cross` makes the drift visible. Until the fuse tables catch up, judge with `--css` in CI and treat the bare tables as a quick local pass.
 
-The bundled `join` is clsx-compatible, but `guard` wraps anything that returns a class string.
+**The stylesheet oracle still compiles with Tailwind itself.** Reimplementing the compiler in Rust would recreate exactly the drift this tool exists to catch. So the judging logic (css.rs) is a pure port and the compiling is one batched `node` call: collect every token the scan will see, hand the batch to bridge/dump-asts.mjs, judge the ASTs in Rust. One subprocess per run, ~100ms. The script resolves @tailwindcss/node from the scanned project first, hopping through @tailwindcss/vite and friends for isolated installs like bun and pnpm, then from the invocation directory as the escape hatch for library packages that rightly declare no tailwind at all.
 
-## The test
+## Test parity
 
-Variant systems written for tailwind-merge restate properties on purpose: the base says `border-transparent`, the outline variant says `border-border`, and the merge picks the winner. This assertion makes "no combo needs merging" something your test suite enforces:
+Every test from the npm package maps here. `bun install` once so the cross test can compile; without it that one test skips.
 
-```ts
-import { assertVariantsMergeFree } from 'overrule/test';
+| v0.3.1 | now |
+| --- | --- |
+| parse.test.ts, 16 cases | src/parse.rs, all 16 |
+| oracle.test.ts, engine behavior | src/oracle.rs, plus the findConflicts cases from guard.test.ts |
+| cli.test.ts, scanner and fix | src/scan.rs units + tests/scan.rs, fixed cross-checked against tw_merge |
+| css.test.ts, 22 cases | src/css.rs, all judging cases against pregenerated ASTs; the platform-neutrality test lives in src/lib.rs |
+| cli-bin.test.ts, binary end to end | tests/cli.rs, including the cross --ack gate against a real Tailwind compile |
+| join.test.ts, guard.test.ts, assert.test.ts | the npm package's suite, that half did not move |
 
-assertVariantsMergeFree(buttonVariants, {
-	variant: ['default', 'outline', 'ghost'],
-	size: ['default', 'sm', 'icon'],
-});
-```
+tests/fixtures/asts*.json are candidatesToAst dumps from the tailwindcss in node_modules; `node tests/fixtures/generate.mjs` regenerates them after a bump.
 
-Failures name the combo and the exact tokens that would be dropped. Freshly pulled shadcn components fail until you distribute the contested tokens into the variants. That is the point.
+## Numbers
 
-## The CLI
+84,300 files (a production monorepo duplicated 100x), warm cache:
 
-```bash
-npx overrule check src/   # report conflicts inside class literals, exit 1 if any
-npx overrule fix src/     # rewrite each one to its merged form
-```
+- npm CLI (node): 1.52s
+- this, single-threaded: 1.15s
+- this, rayon: 0.28s
 
-`fix` writes the same survivors tailwind-merge keeps, so it cannot change a pixel. `check` belongs in CI. The CLI sees one literal at a time; conflicts between a caller and a component's internals only exist at runtime, which is what the guard is for.
+The single-threaded delta is small because the merge engine dominates, not the language. The parallel delta is the actual argument for Rust here, and it cost ten lines.
 
-## The stylesheet oracle
+## Porting notes worth remembering
 
-tailwind-merge classifies classes by name. That is how a custom `border-grid` utility gets read as a border color and deleted. Your compiled CSS already knows the truth about every class, custom utilities included, and overrule can judge with that instead:
-
-```bash
-npx overrule check src/ --css src/app.css   # judge with your stylesheet, not the tables
-npx overrule cross src/ --css src/app.css   # print every case where the two disagree
-```
-
-Point `--css` at the entry that imports tailwindcss. Your theme, custom utilities, and prefix all count, and tokens that compile to nothing get reported as the typos they usually are. Run `cross` on your codebase and every line of output is either a bug to file here or a tailwind-merge misclassification with a reproduction attached.
-
-The same oracle plugs into the guard and the test assertion:
-
-```ts
-import { createCssOracle } from 'overrule/css/node';
-
-const oracle = await createCssOracle({ css: readFileSync('src/app.css', 'utf8'), base: 'src' });
-assertVariantsMergeFree(buttonVariants, axes, oracle);
-```
-
-`overrule/css` holds the judging logic and imports nothing, so it runs anywhere; `overrule/css/node` is the loader. Both need tailwindcss and @tailwindcss/node installed, 4.2 or newer.
-
-## The tokenizer
-
-The checks are built on a small tokenizer, exported as `overrule/parse`. It splits variants on top-level colons, handles importance in both positions v4 accepts, keeps arbitrary values intact through nested brackets and quotes, and order-normalizes variants into a bucket key. Two tokens can only conflict when their buckets match.
-
-```ts
-import { parse } from 'overrule/parse';
-
-parse('md:hover:p-4!');
-// {
-//   raw: 'md:hover:p-4!',
-//   variants: ['md', 'hover'],
-//   bucket: 'hover:md!',
-//   base: 'p-4',
-//   important: true,
-// }
-```
-
-It never guesses what a utility means. That job belongs to the oracle.
-
-## When the caller should win
-
-The component says `rounded-md`. You say:
-
-```svelte
-<Button class="rounded-full!" />
-```
-
-Overruled. Tailwind's important modifier is native, deterministic, and invisible to every check here, because important and normal classes never conflict. One rule to keep in your pocket: when a plain token gets `!`, responsive siblings on the same property need it too. `text-2xl! md:text-3xl` renders 2xl at every width; write `text-2xl! md:text-3xl!`.
-
-## Does it work
-
-overrule came out of deleting tailwind-merge from a production monorepo: seven SvelteKit apps, 233 call sites converted with pixel-identical output, roughly 25KB of minified JavaScript dropped per app. The first time the CLI ran against that codebase, after the migration was supposedly done, it caught two more conflicts on pages nobody had rendered in dev.
-
-Running `cross` back over the same monorepo with each app's real stylesheet: the two oracles agree on everything except one string. The one is a bare `filter` sitting next to `blur-[10px] invert`, dead weight the tables cannot see, because every filter utility restates the whole filter chain.
+- The attr regex excludes BOTH quote types from the content on purpose. A Svelte interpolation `{cond ? 'a' : 'b'}` inside a double-quoted attribute always carries the other quote, so the exclusion is what keeps branch-split literals from being judged as one string. Relaxing it produced a false conflict across ternary branches within the hour.
+- libuv sorts scandir results, Rust's read_dir does not. The walker sorts entries by name so findings come out in the npm CLI's order and outputs stay diffable.
+- Byte indexing is safe everywhere the scanner slices, because every delimiter it looks for is ASCII and an ASCII byte in UTF-8 is always a real character.
+- The Oracle trait takes &self, so the token collector in the CLI holds its set behind a Mutex. It was a RefCell until scan_paths went parallel; the compiler rejected it the same minute.
 
 ## Prior art
 
-[cva](https://github.com/joe-bell/cva) ships without merging, and [tailwind-variants](https://github.com/heroui-inc/tailwind-variants) has `twMerge: false`. The off switch was never the hard part. Surviving it is.
+[tailwind-merge](https://github.com/dcastil/tailwind-merge) is the engine this whole idea demotes to a checker, and [tailwind-fuse](https://github.com/gaucho-labs/tailwind-fuse) carries its tables into Rust. Credit where due: the checking is only possible because they wrote the tables.
 
 ## License
 

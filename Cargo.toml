@@ -1,0 +1,18 @@
+[package]
+name = "overrule"
+version = "0.1.0"
+edition = "2024"
+description = "catch Tailwind class conflicts before they ship. The Rust port of overrule's CLI."
+repository = "https://github.com/Nic-Polumeyv/overrule"
+license = "MIT"
+
+[dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
+rayon = "1.12.0"
+regex = "1.12.4"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.150", features = ["preserve_order"] }
+tailwind_fuse = "0.3.2"
+
+[dev-dependencies]
+tempfile = "3.27.0"
