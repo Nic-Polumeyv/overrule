@@ -1,6 +1,5 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join as joinPath } from 'node:path';
-import { twMerge } from 'tailwind-merge';
 import { findConflicts } from './index.js';
 
 const SCAN_EXTS = new Set(['.svelte', '.tsx', '.jsx', '.vue', '.astro', '.html', '.ts', '.js', '.mjs']);
@@ -13,7 +12,7 @@ export type Finding = {
 	literal: string;
 	/** Tokens the cascade may silently discard. */
 	dropped: string[];
-	/** What tailwind-merge resolves the string to, used by fix. */
+	/** The literal with the losers removed, used by fix. */
 	fixed: string;
 	/** Offsets of the literal's content within the file. */
 	start: number;
@@ -36,6 +35,19 @@ export function* walk(root: string): Generator<string> {
 }
 
 type Literal = { content: string; start: number; end: number };
+
+/**
+ * The literal with losing tokens removed and exact duplicates collapsed into
+ * their last occurrence. Same survivors tailwind-merge keeps, so the rewrite
+ * cannot change a pixel; the test suite cross-checks this against twMerge.
+ */
+function withoutLosers(literal: string, dropped: string[]): string {
+	const losers = new Set(dropped);
+	const tokens = literal.split(/\s+/).filter(Boolean);
+	const lastIndex = new Map<string, number>();
+	tokens.forEach((token, index) => lastIndex.set(token, index));
+	return tokens.filter((token, index) => !losers.has(token) && lastIndex.get(token) === index).join(' ');
+}
 
 const ATTR_RE = /\bclass(?:Name)?=(["'])([^"']+?)\1/g;
 const CALL_RE = /\b(?:cn|cx|clsx|tv|cva)\s*\(/g;
@@ -90,7 +102,7 @@ export function scanSource(src: string): Omit<Finding, 'file'>[] {
 			line: lineOf(literal.start),
 			literal: literal.content,
 			dropped: conflict.dropped,
-			fixed: twMerge(literal.content),
+			fixed: withoutLosers(literal.content, conflict.dropped),
 			start: literal.start,
 			end: literal.end,
 		});

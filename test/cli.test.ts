@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { mkdtempSync, cpSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
+import { twMerge } from 'tailwind-merge';
 import { applyFixes, scanPaths, scanSource } from '../src/scan.js';
 
 const FIXTURES = new URL('./fixtures', import.meta.url).pathname;
@@ -24,6 +25,25 @@ describe('scanSource', () => {
 	test('line numbers point at the literal', () => {
 		const findings = scanSource('a\nb\n<div class="p-1 p-2">');
 		expect(findings[0].line).toBe(3);
+	});
+});
+
+describe('fixed', () => {
+	test('derived from the oracle verdict, identical to what twMerge resolves', () => {
+		const corpus = [
+			'flex h-9 h-8 items-center',
+			'px-4 px-2 text-sm',
+			'grid gap-2 gap-4',
+			'text-sm leading-snug text-xs',
+			'p-2 m-1 p-2 m-2',
+			'inline-flex h-9 px-2 h-8',
+			'md:p-2 font-medium md:p-4',
+		];
+		for (const literal of corpus) {
+			const findings = scanSource(`<div class="${literal}">`);
+			expect(findings).toHaveLength(1);
+			expect(findings[0].fixed).toBe(twMerge(literal));
+		}
 	});
 });
 
