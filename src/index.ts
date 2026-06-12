@@ -1,4 +1,6 @@
-import { twMerge } from 'tailwind-merge';
+import { defaultOracle, type Oracle } from './oracle.js';
+
+export { createTwMergeOracle, defaultOracle, type Oracle } from './oracle.js';
 
 export type ClassValue = ClassValue[] | Record<string, unknown> | string | number | bigint | null | boolean | undefined;
 
@@ -31,12 +33,11 @@ export function join(...inputs: ClassValue[]): string {
 }
 
 /**
- * Returns the tokens tailwind-merge would remove from a class string, or null
- * when merging changes nothing. Duplicate tokens are not conflicts.
+ * Returns the tokens the oracle considers losers in a class string, or null
+ * when nothing conflicts. The default oracle is tailwind-merge.
  */
-export function findConflicts(classes: string): Conflict | null {
-	const kept = new Set(twMerge(classes).split(' '));
-	const dropped = [...new Set(classes.split(/\s+/))].filter((token) => token && !kept.has(token));
+export function findConflicts(classes: string, oracle: Oracle = defaultOracle): Conflict | null {
+	const dropped = oracle(classes);
 	return dropped.length > 0 ? { input: classes, dropped } : null;
 }
 
@@ -60,10 +61,14 @@ function warnOnce(conflict: Conflict): void {
  *
  * Bundlers eliminate the guard (and tailwind-merge with it) from production.
  */
-export function guard<F extends (...args: never[]) => string>(joinFn: F, onConflict: (conflict: Conflict) => void = warnOnce): F {
+export function guard<F extends (...args: never[]) => string>(
+	joinFn: F,
+	onConflict: (conflict: Conflict) => void = warnOnce,
+	oracle: Oracle = defaultOracle,
+): F {
 	const guarded = (...args: never[]): string => {
 		const out = joinFn(...args);
-		const conflict = findConflicts(out);
+		const conflict = findConflicts(out, oracle);
 		if (conflict) onConflict(conflict);
 		return out;
 	};

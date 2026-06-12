@@ -71,8 +71,6 @@ Overruled. Tailwind's important modifier is native, deterministic, and invisible
 
 overrule came out of deleting tailwind-merge from a production monorepo: seven SvelteKit apps, 233 call sites converted with pixel-identical output, roughly 25KB of minified JavaScript dropped per app. The first time the CLI ran against that codebase, after the migration was supposedly done, it caught two more conflicts on pages nobody had rendered in dev.
 
-The kilobytes are nice. The silent deletions were the reason.
-
 ## Prior art
 
 [cva](https://github.com/joe-bell/cva) ships without merging, and [tailwind-variants](https://github.com/heroui-inc/tailwind-variants) has `twMerge: false`. The off switch was never the hard part. Surviving it is.
