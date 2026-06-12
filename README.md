@@ -6,15 +6,24 @@ tailwind-merge as a dev tool, not a dependency. The CLI is Rust now.
 
 The runtime half still ships from npm: `guard`, `join`, and the `overrule/test` assertions run inside your dev bundle, and that is JavaScript's turf. Their source lives at the [v0.3.1 tag](https://github.com/Nic-Polumeyv/overrule/tree/v0.3.1).
 
-## Build and run
+## Install
 
 ```bash
-cargo build --release
-target/release/overrule check src/
-target/release/overrule fix src/
-target/release/overrule check src/ --css src/app.css   # judge with your stylesheet
-target/release/overrule cross src/ --css src/app.css   # tables vs stylesheet
-target/release/overrule cross src/ --ack acks.json     # CI gate: new disagreements only
+bun add -d overrule
+# or
+npm i -D overrule
+```
+
+The package is a native binary behind a 30-line shim: npm picks the right prebuilt from optionalDependencies (linux x64/arm64, macOS x64/arm64, windows x64) and `npx overrule` hands over to it. Any other platform builds from source with `cargo build --release`.
+
+## Run
+
+```bash
+npx overrule check src/                       # report conflicts, exit 1 if any
+npx overrule fix src/                         # rewrite them, losers removed
+npx overrule check src/ --css src/app.css     # judge with your stylesheet
+npx overrule cross src/ --css src/app.css     # tables vs stylesheet
+npx overrule cross src/ --ack acks.json       # CI gate: new disagreements only
 ```
 
 `--css` and `cross` compile your classes with Tailwind itself, so they need node plus tailwindcss and @tailwindcss/node, 4.2 or newer, reachable from the CSS entry's project or from the directory you run in. Plain `check` and `fix` need nothing.

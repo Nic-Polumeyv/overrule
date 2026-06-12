@@ -1,0 +1,90 @@
+// Assembles the publishable npm packages from prebuilt binaries: one tiny
+// package per platform plus the overrule wrapper whose bin is the launcher.
+// The release workflow runs this with all five targets; pass --partial to
+// assemble whatever subset exists locally for testing.
+//
+//   node scripts/assemble-npm.mjs <version> <binaries-dir> <out-dir> [--partial]
+//
+// <binaries-dir> holds one directory per target triple, each containing the
+// overrule binary, which is exactly what actions/download-artifact produces.
+import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const TARGETS = {
+	'x86_64-unknown-linux-gnu': { name: 'overrule-linux-x64', os: 'linux', cpu: 'x64', bin: 'overrule' },
+	'aarch64-unknown-linux-gnu': { name: 'overrule-linux-arm64', os: 'linux', cpu: 'arm64', bin: 'overrule' },
+	'x86_64-apple-darwin': { name: 'overrule-darwin-x64', os: 'darwin', cpu: 'x64', bin: 'overrule' },
+	'aarch64-apple-darwin': { name: 'overrule-darwin-arm64', os: 'darwin', cpu: 'arm64', bin: 'overrule' },
+	'x86_64-pc-windows-msvc': { name: 'overrule-win32-x64', os: 'win32', cpu: 'x64', bin: 'overrule.exe' },
+};
+
+const REPO = { type: 'git', url: 'git+https://github.com/Nic-Polumeyv/overrule.git' };
+
+const [version, binariesDir, outDir] = process.argv.slice(2);
+const partial = process.argv.includes('--partial');
+if (!version || !binariesDir || !outDir) {
+	console.error('usage: node scripts/assemble-npm.mjs <version> <binaries-dir> <out-dir> [--partial]');
+	process.exit(1);
+}
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+rmSync(outDir, { recursive: true, force: true });
+
+const assembled = [];
+for (const [target, platform] of Object.entries(TARGETS)) {
+	const binary = join(binariesDir, target, platform.bin);
+	if (!existsSync(binary)) {
+		if (partial) continue;
+		console.error(`missing binary for ${target}: ${binary}`);
+		process.exit(1);
+	}
+	const dir = join(outDir, platform.name);
+	mkdirSync(dir, { recursive: true });
+	cpSync(binary, join(dir, platform.bin));
+	chmodSync(join(dir, platform.bin), 0o755);
+	writeFileSync(
+		join(dir, 'package.json'),
+		JSON.stringify(
+			{
+				name: platform.name,
+				version,
+				description: `the overrule binary for ${platform.os}-${platform.cpu}`,
+				repository: REPO,
+				license: 'MIT',
+				os: [platform.os],
+				cpu: [platform.cpu],
+				files: [platform.bin],
+			},
+			null,
+			'\t',
+		) + '\n',
+	);
+	assembled.push(platform.name);
+}
+
+const wrapper = join(outDir, 'overrule');
+mkdirSync(join(wrapper, 'bin'), { recursive: true });
+cpSync(join(root, 'npm/launcher.cjs'), join(wrapper, 'bin/overrule.js'));
+cpSync(join(root, 'README.md'), join(wrapper, 'README.md'));
+cpSync(join(root, 'LICENSE'), join(wrapper, 'LICENSE'));
+writeFileSync(
+	join(wrapper, 'package.json'),
+	JSON.stringify(
+		{
+			name: 'overrule',
+			version,
+			description: 'catch Tailwind class conflicts before they ship. Native binary, delivered through npm.',
+			repository: REPO,
+			license: 'MIT',
+			bin: { overrule: 'bin/overrule.js' },
+			engines: { node: '>=18' },
+			optionalDependencies: Object.fromEntries(Object.values(TARGETS).map((p) => [p.name, version])),
+			files: ['bin'],
+		},
+		null,
+		'\t',
+	) + '\n',
+);
+
+console.log(`assembled ${assembled.length} platform packages + wrapper at ${outDir} (version ${version})`);
