@@ -7,7 +7,10 @@
 		"name": "Nic Polumeyv",
 		"url": "https://github.com/Nic-Polumeyv"
 	},
-	"repository": "github:Nic-Polumeyv/overrule",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Nic-Polumeyv/overrule.git"
+	},
 	"type": "module",
 	"engines": {
 		"node": ">=20"
@@ -21,7 +24,7 @@
 		"codemod"
 	],
 	"bin": {
-		"overrule": "./dist/cli.js"
+		"overrule": "dist/cli.js"
 	},
 	"exports": {
 		".": {
