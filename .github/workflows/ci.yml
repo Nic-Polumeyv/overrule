@@ -14,3 +14,13 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun test
       - run: bun run build
+      - name: cli contract under node
+        run: |
+          node dist/cli.js check src
+          set +e
+          out=$(node dist/cli.js check test/fixtures)
+          code=$?
+          set -e
+          echo "$out"
+          test "$code" -eq 1
+          echo "$out" | grep -q "conflicting class strings"
