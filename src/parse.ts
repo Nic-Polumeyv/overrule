@@ -17,7 +17,7 @@ export type Parsed = {
 	bucket: string;
 	/** The utility itself, with arbitrary values and slash modifiers intact. */
 	base: string;
-	/** Trailing ! (Tailwind v4 syntax) or leading ! (v3 syntax). */
+	/** Trailing ! (the v4 position) or leading ! (the legacy position v4 still accepts). */
 	important: boolean;
 };
 
@@ -73,13 +73,23 @@ function splitTopLevel(token: string): string[] {
 }
 
 /**
- * Order-normalize variants into a bucket key. Order-insensitive variants are
- * sorted; order-sensitive ones keep their positions relative to everything.
+ * Order-normalize variants into a bucket key. Variants commute only within
+ * the stretch between order-sensitive ones: hover before a pseudo-element
+ * reaches a different box than hover after it. So each stretch sorts on its
+ * own and the order-sensitive variants pin the boundaries.
  */
 export function bucketOf(variants: string[], important: boolean): string {
-	const sortable = variants.filter((variant) => !isOrderSensitive(variant)).sort();
-	let next = 0;
-	const normalized = variants.map((variant) => (isOrderSensitive(variant) ? variant : sortable[next++]));
+	const normalized: string[] = [];
+	let segment: string[] = [];
+	for (const variant of variants) {
+		if (isOrderSensitive(variant)) {
+			normalized.push(...segment.sort(), variant);
+			segment = [];
+		} else {
+			segment.push(variant);
+		}
+	}
+	normalized.push(...segment.sort());
 	return normalized.join(':') + (important ? '!' : '');
 }
 

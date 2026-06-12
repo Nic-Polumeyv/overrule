@@ -83,6 +83,12 @@ describe('bucketOf', () => {
 		expect(parse('[&>svg]:hover:opacity-50').bucket).not.toBe(parse('hover:[&>svg]:opacity-50').bucket);
 	});
 
+	test('variants on opposite sides of a pseudo-element stay distinct', () => {
+		expect(parse('focus:before:underline').bucket).not.toBe(parse('before:focus:underline').bucket);
+		expect(parse('md:before:hover:m-1').bucket).not.toBe(parse('hover:md:before:m-1').bucket);
+		expect(parse('md:hover:before:m-1').bucket).toBe(parse('hover:md:before:m-1').bucket);
+	});
+
 	test('importance separates buckets', () => {
 		expect(parse('p-4').bucket).not.toBe(parse('p-4!').bucket);
 		expect(parse('md:p-4!').bucket).toBe(parse('md:p-2!').bucket);
