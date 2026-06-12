@@ -1,17 +1,17 @@
-import { findConflicts } from './index.js';
+import { findConflicts, type Oracle } from './index.js';
 
 /**
- * Check a class string for conflicts. ok means tailwind-merge would change
+ * Check a class string for conflicts. ok means the oracle would change
  * nothing: every token survives, so the string needs no runtime referee.
  */
-export function mergeFree(classes: string): { ok: boolean; dropped: string[] } {
-	const conflict = findConflicts(classes);
+export function mergeFree(classes: string, oracle?: Oracle): { ok: boolean; dropped: string[] } {
+	const conflict = findConflicts(classes, oracle);
 	return conflict ? { ok: false, dropped: conflict.dropped } : { ok: true, dropped: [] };
 }
 
 /** Throws when a class string has conflicting tokens, listing exactly which ones lose. */
-export function assertMergeFree(classes: string): void {
-	const result = mergeFree(classes);
+export function assertMergeFree(classes: string, oracle?: Oracle): void {
+	const result = mergeFree(classes, oracle);
 	if (!result.ok) {
 		throw new Error(`classes are not merge-free: "${result.dropped.join(' ')}" would be dropped from "${classes}"`);
 	}
@@ -35,10 +35,11 @@ export function combos(axes: Record<string, readonly string[]>): Record<string, 
 export function assertVariantsMergeFree(
 	variants: (props?: Record<string, string>) => string,
 	axes: Record<string, readonly string[]>,
+	oracle?: Oracle,
 ): void {
 	for (const combo of combos(axes)) {
 		try {
-			assertMergeFree(variants(combo));
+			assertMergeFree(variants(combo), oracle);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);
 			throw new Error(`variant combo ${JSON.stringify(combo)}: ${detail}`);
