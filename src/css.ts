@@ -228,14 +228,17 @@ export function cssOracle(designSystem: DesignSystemLike): Oracle {
 			beatenBy.set(token, flags);
 		}
 
-		// Custom properties that surviving declarations still read. A token
-		// whose only surviving output is an unread --tw-* variable is dead
-		// anyway; one that feeds a surviving var() is composing, not losing.
+		// Custom properties that surviving declarations still read, across all
+		// buckets: a property set under aria-invalid feeds a shadow declared
+		// under focus-visible the moment both states hold, because the variable
+		// lives on the element, not in the rule. A token whose only surviving
+		// output is an unread --tw-* variable is dead anyway; one that feeds a
+		// surviving var() is composing, not losing.
 		const read = new Set<string>();
 		for (const token of known) {
 			cache.get(token)!.forEach((decl, i) => {
 				if (beatenBy.get(token)![i]) return;
-				for (const match of decl.value.matchAll(VAR_RE)) read.add(`${decl.bucket} ${match[1]}`);
+				for (const match of decl.value.matchAll(VAR_RE)) read.add(match[1]);
 			});
 		}
 
@@ -244,7 +247,7 @@ export function cssOracle(designSystem: DesignSystemLike): Oracle {
 			if (decls.length === 0) return false;
 			return decls.every((decl, i) => {
 				if (beatenBy.get(token)![i]) return true;
-				if (decl.property.startsWith('--tw-')) return !read.has(`${decl.bucket} ${decl.property}`);
+				if (decl.property.startsWith('--tw-')) return !read.has(decl.property);
 				return false;
 			});
 		});
