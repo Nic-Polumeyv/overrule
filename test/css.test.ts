@@ -67,8 +67,17 @@ describe('createCssOracle', () => {
 		expect(oracle('text-xs leading-snug')).toEqual([]);
 		expect(oracle('leading-tight leading-snug')).toEqual(['leading-tight']);
 		expect(oracle('ordinal slashed-zero')).toEqual([]);
-		expect(oracle('ordinal normal-nums')).toEqual(['ordinal']);
-		expect(oracle('translate-x-2 translate-none')).toEqual(['translate-x-2']);
+	});
+
+	test('an unbeaten custom property is an export, not dead weight', () => {
+		// cva splits strings that only meet at runtime: the variant sets the
+		// ring color, the base sets the ring width, and the variable lives on
+		// the element. Anything the merge tables would kill here is a
+		// cross-check conversation, never a fix.
+		expect(oracle('focus-visible:ring-red-500/50 bg-red-500')).toEqual([]);
+		expect(oracle('font-medium [font-weight:900]')).toEqual([]);
+		expect(oracle('translate-x-2 translate-none')).toEqual([]);
+		expect(oracle('ordinal normal-nums')).toEqual([]);
 	});
 
 	test('ring and shadow compose through the shared box-shadow', () => {
@@ -83,9 +92,12 @@ describe('createCssOracle', () => {
 		expect(oracle('aria-invalid:ring-red-500/20 focus-visible:ring-[3px]')).toEqual([]);
 	});
 
-	test('a postfix line height is a fixed value, so leading before it dies', () => {
-		expect(oracle('leading-snug text-lg/7')).toEqual(['leading-snug']);
+	test('a postfix line height kills an earlier text size whole', () => {
+		expect(oracle('text-sm text-lg/7')).toEqual(['text-sm']);
 		expect(oracle('text-lg/7 leading-snug')).toEqual([]);
+		// leading-snug before the postfix survives too: its variable is an
+		// export, and the tables disagree here on purpose.
+		expect(oracle('leading-snug text-lg/7')).toEqual([]);
 	});
 
 	test('multi-declaration utilities die only when fully covered', () => {
@@ -100,7 +112,6 @@ describe('createCssOracle', () => {
 
 	test('arbitrary properties contest the real property', () => {
 		expect(oracle('[padding:1rem] p-4')).toEqual(['[padding:1rem]']);
-		expect(oracle('font-medium [font-weight:900]')).toEqual(['font-medium']);
 	});
 
 	test('tokens that only set custom properties stay alive', () => {
