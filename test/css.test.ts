@@ -75,6 +75,14 @@ describe('createCssOracle', () => {
 		expect(oracle('ring-2 shadow-lg')).toEqual([]);
 	});
 
+	test('custom properties cross buckets: ring color feeds ring width', () => {
+		// The shadcn pattern. The color is set under one state, the width
+		// under another, and the variable lives on the element, so both
+		// apply the moment the states hold together.
+		expect(oracle('ring-red-500/50 focus-visible:ring-[3px]')).toEqual([]);
+		expect(oracle('aria-invalid:ring-red-500/20 focus-visible:ring-[3px]')).toEqual([]);
+	});
+
 	test('a postfix line height is a fixed value, so leading before it dies', () => {
 		expect(oracle('leading-snug text-lg/7')).toEqual(['leading-snug']);
 		expect(oracle('text-lg/7 leading-snug')).toEqual([]);
