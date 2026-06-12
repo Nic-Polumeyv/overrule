@@ -1,5 +1,7 @@
 # overrule
 
+tailwind-merge as a dev tool, not a dependency.
+
 Somewhere in your bundle right now, tailwind-merge is re-litigating an argument you settled the day you wrote the code: `h-9` or `h-8`? It runs on every render, on every one of your users' devices, and it usually picks the right winner. Usually. It also deletes custom utilities it mis-classifies (a custom `border-grid` utility reads as a border color and silently vanishes when a real one shows up), and it takes innocent bystanders with it (a later `text-xs` removes `leading-snug`, because font size conflicts with line height).
 
 Here's the thing: class conflicts are not a runtime problem. CSS ignores the order of your class attribute, so when two classes set the same property, stylesheet order picks the winner. That is a coin flip, and tailwind-merge exists to rig it. But you wrote the conflict once. Resolve it once, in source, and demote tailwind-merge to the job it is genuinely great at: checking your work.
@@ -68,6 +70,8 @@ Overruled. Tailwind's important modifier is native, deterministic, and invisible
 ## Does it work
 
 overrule came out of deleting tailwind-merge from a production monorepo: seven SvelteKit apps, 233 call sites converted with pixel-identical output, roughly 25KB of minified JavaScript dropped per app. The first time the CLI ran against that codebase, after the migration was supposedly done, it caught two more conflicts on pages nobody had rendered in dev.
+
+The kilobytes are nice. The silent deletions were the reason.
 
 ## Prior art
 
