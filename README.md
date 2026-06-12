@@ -59,7 +59,7 @@ npx overrule fix src/     # rewrite each one to its merged form
 
 ## The tokenizer
 
-The checks are built on a small tokenizer, exported as `overrule/parse`. It splits variants on top-level colons, handles importance in both syntaxes, keeps arbitrary values intact through nested brackets and quotes, and order-normalizes variants into a bucket key. Two tokens can only conflict when their buckets match.
+The checks are built on a small tokenizer, exported as `overrule/parse`. It splits variants on top-level colons, handles importance in both positions v4 accepts, keeps arbitrary values intact through nested brackets and quotes, and order-normalizes variants into a bucket key. Two tokens can only conflict when their buckets match.
 
 ```ts
 import { parse } from 'overrule/parse';
