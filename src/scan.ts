@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join as joinPath } from 'node:path';
-import { findConflicts } from './index.js';
+import { findConflicts, type Oracle } from './index.js';
 
 const SCAN_EXTS = new Set(['.svelte', '.tsx', '.jsx', '.vue', '.astro', '.html', '.ts', '.js', '.mjs']);
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', '.git', '.svelte-kit', '.next', '.output', '.vercel']);
@@ -77,7 +77,7 @@ function literalsInCall(src: string, openParen: number): { literals: Literal[]; 
 	return { literals, end: i };
 }
 
-export function scanSource(src: string): Omit<Finding, 'file'>[] {
+export function scanSource(src: string, oracle?: Oracle): Omit<Finding, 'file'>[] {
 	const literals: Literal[] = [];
 
 	for (const match of src.matchAll(ATTR_RE)) {
@@ -96,7 +96,7 @@ export function scanSource(src: string): Omit<Finding, 'file'>[] {
 		if (seen.has(literal.start)) continue;
 		seen.add(literal.start);
 		if (!/\S\s+\S/.test(literal.content)) continue;
-		const conflict = findConflicts(literal.content);
+		const conflict = findConflicts(literal.content, oracle);
 		if (!conflict) continue;
 		findings.push({
 			line: lineOf(literal.start),
@@ -110,12 +110,12 @@ export function scanSource(src: string): Omit<Finding, 'file'>[] {
 	return findings;
 }
 
-export function scanPaths(paths: string[]): Finding[] {
+export function scanPaths(paths: string[], oracle?: Oracle): Finding[] {
 	const findings: Finding[] = [];
 	for (const path of paths) {
 		for (const file of walk(path)) {
 			const src = readFileSync(file, 'utf8');
-			for (const finding of scanSource(src)) findings.push({ file, ...finding });
+			for (const finding of scanSource(src, oracle)) findings.push({ file, ...finding });
 		}
 	}
 	return findings;
