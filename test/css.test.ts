@@ -1,14 +1,18 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
-import { createCssOracle } from '../src/css.js';
+import { readFileSync } from 'node:fs';
+import { cssOracle } from '../src/css.js';
+import { createCssOracle } from '../src/css-node.js';
 import type { Oracle } from '../src/index.js';
 
 let oracle: Oracle;
+let prefixed: Oracle;
 
 beforeAll(async () => {
 	oracle = await createCssOracle({
 		css: '@import "tailwindcss"; @utility border-grid { border: 1px solid red; }',
 		base: process.cwd(),
 	});
+	prefixed = await createCssOracle({ css: '@import "tailwindcss" prefix(tw);', base: process.cwd() });
 });
 
 describe('createCssOracle', () => {
@@ -39,11 +43,15 @@ describe('createCssOracle', () => {
 
 	test('pseudo-element variant order styles different boxes', () => {
 		expect(oracle('before:hover:m-1 hover:before:m-2')).toEqual([]);
+		expect(oracle('before:focus:underline before:focus:no-underline')).toEqual(['before:focus:underline']);
+		expect(oracle('before:focus:underline focus:before:no-underline')).toEqual([]);
 	});
 
 	test('a later shorthand kills the longhand, the reverse layers', () => {
 		expect(oracle('px-2 p-4')).toEqual(['px-2']);
 		expect(oracle('p-4 px-2')).toEqual([]);
+		expect(oracle('scroll-mt-2 scroll-m-4')).toEqual(['scroll-mt-2']);
+		expect(oracle('scroll-m-4 scroll-mt-2')).toEqual([]);
 	});
 
 	test('custom utilities are first class: border-grid survives a border color', () => {
@@ -58,10 +66,28 @@ describe('createCssOracle', () => {
 		expect(oracle('leading-snug text-xs')).toEqual([]);
 		expect(oracle('text-xs leading-snug')).toEqual([]);
 		expect(oracle('leading-tight leading-snug')).toEqual(['leading-tight']);
+		expect(oracle('ordinal slashed-zero')).toEqual([]);
+		expect(oracle('ordinal normal-nums')).toEqual(['ordinal']);
+		expect(oracle('translate-x-2 translate-none')).toEqual(['translate-x-2']);
 	});
 
 	test('ring and shadow compose through the shared box-shadow', () => {
 		expect(oracle('ring-2 shadow-lg')).toEqual([]);
+	});
+
+	test('a postfix line height is a fixed value, so leading before it dies', () => {
+		expect(oracle('leading-snug text-lg/7')).toEqual(['leading-snug']);
+		expect(oracle('text-lg/7 leading-snug')).toEqual([]);
+	});
+
+	test('multi-declaration utilities die only when fully covered', () => {
+		expect(oracle('flex line-clamp-2')).toEqual(['flex']);
+		expect(oracle('line-clamp-2 flex')).toEqual([]);
+	});
+
+	test('arbitrary variants compile and bucket like any other', () => {
+		expect(oracle('[&>svg]:size-4 [&>svg]:size-5')).toEqual(['[&>svg]:size-4']);
+		expect(oracle('[&>svg]:hover:size-4 hover:[&>svg]:size-5')).toEqual([]);
 	});
 
 	test('arbitrary properties contest the real property', () => {
@@ -76,5 +102,26 @@ describe('createCssOracle', () => {
 	test('unknown tokens are skipped, never reported', () => {
 		expect(oracle('text-xsm p-4 p-2')).toEqual(['p-4']);
 		expect(oracle('not-a-class also-not-one')).toEqual([]);
+	});
+
+	test('a prefixed project conflicts on prefixed tokens and ignores bare ones', () => {
+		expect(prefixed('tw:p-2 tw:p-4')).toEqual(['tw:p-2']);
+		expect(prefixed('p-2 p-4')).toEqual([]);
+	});
+});
+
+describe('cssOracle', () => {
+	test('rejects anything without candidatesToAst', () => {
+		expect(() => cssOracle({} as never)).toThrow('candidatesToAst');
+	});
+});
+
+describe('platform neutrality', () => {
+	test('only the cli, the scanner, and the node loader may touch node', () => {
+		const neutral = ['index.ts', 'oracle.ts', 'parse.ts', 'test.ts', 'css.ts'];
+		for (const file of neutral) {
+			const src = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
+			expect(src).not.toMatch(/\bnode:|@tailwindcss\/node|\bprocess\./);
+		}
 	});
 });
