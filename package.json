@@ -31,6 +31,10 @@
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
 		},
+		"./parse": {
+			"types": "./dist/parse.d.ts",
+			"default": "./dist/parse.js"
+		},
 		"./test": {
 			"types": "./dist/test.d.ts",
 			"default": "./dist/test.js"

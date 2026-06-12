@@ -57,6 +57,25 @@ npx overrule fix src/     # rewrite each one to its merged form
 
 `fix` writes exactly what tailwind-merge already resolved the string to, so it cannot change a pixel. `check` belongs in CI. The CLI sees one literal at a time; conflicts between a caller and a component's internals only exist at runtime, which is what the guard is for.
 
+## The tokenizer
+
+The checks are built on a small tokenizer, exported as `overrule/parse`. It splits variants on top-level colons, handles importance in both syntaxes, keeps arbitrary values intact through nested brackets and quotes, and order-normalizes variants into a bucket key. Two tokens can only conflict when their buckets match.
+
+```ts
+import { parse } from 'overrule/parse';
+
+parse('md:hover:p-4!');
+// {
+//   raw: 'md:hover:p-4!',
+//   variants: ['md', 'hover'],
+//   bucket: 'hover:md!',
+//   base: 'p-4',
+//   important: true,
+// }
+```
+
+It never guesses what a utility means. That job belongs to the oracle, and the stylesheet-derived oracle on the roadmap builds on these buckets.
+
 ## When the caller should win
 
 The component says `rounded-md`. You say:
