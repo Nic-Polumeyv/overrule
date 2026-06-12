@@ -1,6 +1,6 @@
 {
 	"name": "overrule",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Catch Tailwind class conflicts in dev and CI, fix them in source, ship none of tailwind-merge.",
 	"license": "MIT",
 	"author": {
