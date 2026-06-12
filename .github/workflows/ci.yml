@@ -18,7 +18,7 @@ jobs:
         run: |
           node dist/cli.js check src
           set +e
-          out=$(node dist/cli.js check test/fixtures)
+          out=$(env -u GITHUB_ACTIONS node dist/cli.js check test/fixtures)
           code=$?
           set -e
           echo "$out"

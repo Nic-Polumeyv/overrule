@@ -16,6 +16,13 @@ Options:
                  Point it at the CSS entry that imports tailwindcss; your theme, custom
                  utilities, and prefix all count. Tokens that compile to nothing get
                  listed too. cross uses a bare tailwindcss import when --css is missing.
+  --json         machine output. Findings for check and fix, disagreements for cross.
+  --ack <file>   cross only. A snapshot from cross --json listing acknowledged
+                 disagreements; anything not in it prints and exits 1. This is how
+                 cross becomes a CI gate instead of an investigation.
+
+Inside GitHub Actions, check and cross also emit ::error annotations, so findings
+land on the pull request diff.
 
 Paths default to the current directory. node_modules, dist, and friends are skipped.
 
@@ -27,12 +34,22 @@ const command = argv[0];
 const paths: string[] = [];
 let cssEntry: string | undefined;
 let wantsCss = false;
+let json = false;
+let ackFile: string | undefined;
 for (let i = 1; i < argv.length; i++) {
 	if (argv[i] === '--css') {
 		wantsCss = true;
 		cssEntry = argv[++i];
 		if (cssEntry === undefined) {
 			console.error('--css needs a file path.');
+			process.exit(1);
+		}
+	} else if (argv[i] === '--json') {
+		json = true;
+	} else if (argv[i] === '--ack') {
+		ackFile = argv[++i];
+		if (ackFile === undefined) {
+			console.error('--ack needs a file path.');
 			process.exit(1);
 		}
 	} else {
@@ -45,6 +62,16 @@ if (command !== 'check' && command !== 'fix' && command !== 'cross') {
 	console.log(USAGE);
 	process.exit(command ? 1 : 0);
 }
+if (ackFile !== undefined && command !== 'cross') {
+	console.error('--ack only means something to cross.');
+	process.exit(1);
+}
+
+const inActions = process.env.GITHUB_ACTIONS === 'true';
+const escapeData = (value: string) => value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+const escapeProp = (value: string) => escapeData(value).replace(/:/g, '%3A').replace(/,/g, '%2C');
+const annotate = (file: string, line: number, message: string) =>
+	console.log(`::error file=${escapeProp(file)},line=${line},title=overrule::${escapeData(message)}`);
 
 let oracle: Oracle | undefined;
 let typos: Oracle | undefined;
@@ -74,14 +101,55 @@ if (command === 'cross') {
 	};
 	for (const finding of tables) entryFor(finding).tables = finding.dropped;
 	for (const finding of sheet) entryFor(finding).sheet = finding.dropped;
-	const signature = (dropped?: string[]) => [...(dropped ?? [])].sort().join(' ');
+	const sorted = (dropped?: string[]) => [...(dropped ?? [])].sort().join(' ');
 	const verdict = (dropped?: string[]) => (dropped?.length ? `drops ${dropped.join(' ')}` : 'drops nothing');
-	const diffs = [...entries.values()].filter((entry) => signature(entry.tables) !== signature(entry.sheet));
+	let diffs = [...entries.values()].filter((entry) => sorted(entry.tables) !== sorted(entry.sheet));
+
+	let acknowledged = 0;
+	if (ackFile !== undefined) {
+		const parsed: unknown = JSON.parse(readFileSync(ackFile, 'utf8'));
+		const list = Array.isArray(parsed) ? parsed : ((parsed as { disagreements?: Entry[] }).disagreements ?? []);
+		// The signature ignores file and line on purpose: an acknowledged
+		// string stays acknowledged when it moves or gets copied.
+		const signature = (entry: Entry) => `${entry.literal}\n${sorted(entry.tables)}\n${sorted(entry.sheet)}`;
+		const known = new Set((list as Entry[]).map(signature));
+		const fresh = diffs.filter((entry) => !known.has(signature(entry)));
+		acknowledged = diffs.length - fresh.length;
+		diffs = fresh;
+	}
+
+	if (json) {
+		const disagreements = diffs.map(({ file, line, literal, tables: t, sheet: s }) => ({
+			file,
+			line,
+			literal,
+			tables: t ?? [],
+			sheet: s ?? [],
+		}));
+		console.log(JSON.stringify({ disagreements }, null, '\t'));
+		process.exit(ackFile !== undefined && diffs.length > 0 ? 1 : 0);
+	}
+
 	for (const entry of diffs) {
 		console.log(`${entry.file}:${entry.line}`);
 		console.log(`  in              "${entry.literal}"`);
 		console.log(`  tailwind-merge  ${verdict(entry.tables)}`);
 		console.log(`  stylesheet      ${verdict(entry.sheet)}`);
+		if (inActions) {
+			annotate(
+				entry.file,
+				entry.line,
+				`oracles disagree on "${entry.literal}": tailwind-merge ${verdict(entry.tables)}, stylesheet ${verdict(entry.sheet)}`,
+			);
+		}
+	}
+	if (ackFile !== undefined) {
+		console.log(
+			diffs.length === 0
+				? `overrule: no new disagreements, ${acknowledged} acknowledged.`
+				: `\n${diffs.length} new ${diffs.length === 1 ? 'disagreement' : 'disagreements'}, ${acknowledged} acknowledged. Inspect each one, then refresh the snapshot with cross --json.`,
+		);
+		process.exit(diffs.length > 0 ? 1 : 0);
 	}
 	console.log(
 		diffs.length === 0
@@ -94,6 +162,21 @@ if (command === 'cross') {
 const findings = scanPaths(paths, oracle);
 const unknowns = typos ? scanPaths(paths, typos) : [];
 
+if (json) {
+	if (command === 'fix') applyFixes(findings);
+	console.log(
+		JSON.stringify(
+			{
+				findings: findings.map(({ file, line, literal, dropped, fixed }) => ({ file, line, literal, dropped, fixed })),
+				unknown: unknowns.map(({ file, line, literal, dropped }) => ({ file, line, literal, tokens: dropped })),
+			},
+			null,
+			'\t',
+		),
+	);
+	process.exit(command === 'check' && findings.length > 0 ? 1 : 0);
+}
+
 if (findings.length === 0) {
 	console.log('overrule: no class conflicts found.');
 } else {
@@ -102,6 +185,13 @@ if (findings.length === 0) {
 		console.log(`  drops  ${finding.dropped.join(' ')}`);
 		console.log(`  in     "${finding.literal}"`);
 		console.log(`  keeps  "${finding.fixed}"`);
+		if (inActions && command === 'check') {
+			annotate(
+				finding.file,
+				finding.line,
+				`"${finding.dropped.join(' ')}" conflicts in "${finding.literal}". The cascade decides which wins; "${finding.fixed}" is the resolved form.`,
+			);
+		}
 	}
 }
 
