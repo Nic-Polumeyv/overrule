@@ -9,8 +9,10 @@ export type { Oracle } from './oracle.js';
  * design system and judged by the declarations it actually produces: a token
  * loses only when every declaration it makes is overridden by a later token
  * in the same variant bucket. Custom utilities are first class by
- * construction, and tokens that feed surviving var() references (leading-*
- * into text-*, ring-* into shadow-*) are composing, not losing.
+ * construction, and a custom property is a declaration in its own right:
+ * leading-* feeds text-*, ring color feeds ring width, and the reader may
+ * live in another string on the same element, so setting a variable counts
+ * as an effect even when nothing in this string reads it.
  *
  * This module is platform-neutral on purpose, like the runtime API: no Node,
  * no filesystem, nothing but the design system you hand it. Load that design
@@ -185,8 +187,6 @@ function declsOf(candidate: string, roots: AstNode[]): Decl[] | null {
 	}));
 }
 
-const VAR_RE = /var\(\s*(--[^\s,)]+)/g;
-
 /**
  * Build an oracle from a loaded design system. Synchronous and cached per
  * token, so guard() and the test helpers use it unchanged.
@@ -215,41 +215,21 @@ export function cssOracle(designSystem: DesignSystemLike): Oracle {
 
 		// A declaration is beaten when a later token declares the same or a
 		// covering property in the same bucket. Importance is part of the
-		// bucket, so important and normal declarations never contest.
-		const beatenBy = new Map<string, boolean[]>();
-		for (const token of known) {
-			const flags = cache.get(token)!.map((decl) =>
+		// bucket, so important and normal declarations never contest. A token
+		// is dead only when every declaration it makes is beaten: an unbeaten
+		// custom property is an export, not dead weight, because cva splits
+		// strings that only meet at runtime and the reader can sit in any of
+		// them. fix removes nothing that could reach a pixel.
+		return known.filter((token) => {
+			const decls = cache.get(token)!;
+			if (decls.length === 0) return false;
+			return decls.every((decl) =>
 				known.some(
 					(other) =>
 						position.get(other)! > position.get(token)! &&
 						cache.get(other)!.some((own) => own.bucket === decl.bucket && overrides(own.property, decl.property)),
 				),
 			);
-			beatenBy.set(token, flags);
-		}
-
-		// Custom properties that surviving declarations still read, across all
-		// buckets: a property set under aria-invalid feeds a shadow declared
-		// under focus-visible the moment both states hold, because the variable
-		// lives on the element, not in the rule. A token whose only surviving
-		// output is an unread --tw-* variable is dead anyway; one that feeds a
-		// surviving var() is composing, not losing.
-		const read = new Set<string>();
-		for (const token of known) {
-			cache.get(token)!.forEach((decl, i) => {
-				if (beatenBy.get(token)![i]) return;
-				for (const match of decl.value.matchAll(VAR_RE)) read.add(match[1]);
-			});
-		}
-
-		return known.filter((token) => {
-			const decls = cache.get(token)!;
-			if (decls.length === 0) return false;
-			return decls.every((decl, i) => {
-				if (beatenBy.get(token)![i]) return true;
-				if (decl.property.startsWith('--tw-')) return !read.has(decl.property);
-				return false;
-			});
 		});
 	};
 }
