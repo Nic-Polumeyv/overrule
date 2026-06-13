@@ -65,22 +65,33 @@ for (const [target, platform] of Object.entries(TARGETS)) {
 
 const wrapper = join(outDir, 'overrule');
 mkdirSync(join(wrapper, 'bin'), { recursive: true });
-cpSync(join(root, 'npm/launcher.cjs'), join(wrapper, 'bin/overrule.js'));
+// .cjs, not .js: the package is `type: module` now (for the runtime), and the
+// launcher is CommonJS. The extension keeps node parsing it as CJS regardless.
+cpSync(join(root, 'npm/launcher.cjs'), join(wrapper, 'bin/overrule.cjs'));
 cpSync(join(root, 'README.md'), join(wrapper, 'README.md'));
 cpSync(join(root, 'LICENSE'), join(wrapper, 'LICENSE'));
+// The JS runtime half — join/guard/test run in consumers' dev bundles; the binary is
+// the CLI half. Built by `tsc -p tsconfig.runtime.json` into runtime-dist/.
+cpSync(join(root, 'runtime-dist'), join(wrapper, 'runtime'), { recursive: true });
 writeFileSync(
 	join(wrapper, 'package.json'),
 	JSON.stringify(
 		{
 			name: 'overrule',
 			version,
-			description: 'catch Tailwind class conflicts before they ship. Native binary, delivered through npm.',
+			description: 'catch Tailwind class conflicts before they ship. Native binary CLI plus the join/guard runtime.',
 			repository: REPO,
 			license: 'MIT',
-			bin: { overrule: 'bin/overrule.js' },
+			type: 'module',
+			bin: { overrule: 'bin/overrule.cjs' },
 			engines: { node: '>=18' },
+			exports: {
+				'.': { types: './runtime/index.d.ts', default: './runtime/index.js' },
+				'./test': { types: './runtime/test.d.ts', default: './runtime/test.js' },
+			},
+			dependencies: { 'tailwind-merge': '^3.6.0' },
 			optionalDependencies: Object.fromEntries(Object.values(TARGETS).map((p) => [p.name, version])),
-			files: ['bin'],
+			files: ['bin', 'runtime'],
 		},
 		null,
 		'\t',
