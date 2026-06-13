@@ -205,6 +205,30 @@ static COVERED_BY: LazyLock<HashMap<String, Vec<String>>> = LazyLock::new(|| {
             );
         }
     }
+    // Logical border sides, what border-bs-*/border-be-* emit since v4.2.
+    // Coverage stays within the logical family plus the full shorthands,
+    // which reset every side in every writing mode; physical and logical
+    // never claim each other because that mapping depends on writing mode.
+    for axis in ["inline", "block"] {
+        for edge in ["start", "end"] {
+            covered(
+                format!("border-{axis}-{edge}"),
+                &[format!("border-{axis}"), "border".to_string()],
+            );
+            for aspect in ["width", "style", "color"] {
+                covered(
+                    format!("border-{axis}-{edge}-{aspect}"),
+                    &[
+                        format!("border-{axis}-{edge}"),
+                        format!("border-{axis}-{aspect}"),
+                        format!("border-{axis}"),
+                        format!("border-{aspect}"),
+                        "border".to_string(),
+                    ],
+                );
+            }
+        }
+    }
     for corner in [
         "top-left",
         "top-right",
@@ -247,9 +271,18 @@ static COVERED_BY: LazyLock<HashMap<String, Vec<String>>> = LazyLock::new(|| {
         "font-style",
         "font-stretch",
         "font-variant",
+        // The font shorthand resets this to initial too; font-features-*
+        // emits it since v4.2.
+        "font-feature-settings",
     ] {
         covered(longhand.into(), &owned(&["font"]));
     }
+    // ordinal and friends emit font-variant-numeric, which both the
+    // font-variant shorthand and font reset.
+    covered(
+        "font-variant-numeric".into(),
+        &owned(&["font-variant", "font"]),
+    );
     for aspect in ["width", "style", "color", "offset"] {
         covered(format!("outline-{aspect}"), &owned(&["outline"]));
     }
@@ -619,6 +652,23 @@ mod tests {
     #[test]
     fn tokens_that_only_set_custom_properties_stay_alive() {
         assert!(losers(&oracle(), "[--cell-size:3rem] p-4").is_empty());
+    }
+
+    #[test]
+    fn logical_border_sides_die_under_the_full_shorthand_v42() {
+        // border-bs-2 emits border-block-start width and style; a later
+        // border resets every side in every writing mode. The reverse
+        // layers, and physical vs logical never contest each other.
+        let o = oracle();
+        assert_eq!(losers(&o, "border-bs-2 border"), ["border-bs-2"]);
+        assert!(losers(&o, "border border-bs-2").is_empty());
+    }
+
+    #[test]
+    fn logical_padding_was_already_covered_v42_just_renames_it() {
+        let o = oracle();
+        assert_eq!(losers(&o, "pbs-2 p-4"), ["pbs-2"]);
+        assert!(losers(&o, "p-4 pbs-2").is_empty());
     }
 
     #[test]
