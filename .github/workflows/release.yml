@@ -42,8 +42,16 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC trusted publishing — no NPM_TOKEN, no OTP
+      contents: write # gh release create
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm install -g npm@latest # trusted publishing needs npm >= 11.5.1
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bunx tsc -p tsconfig.runtime.json # build the JS runtime half (join/guard/test)
@@ -51,7 +59,12 @@ jobs:
         with:
           path: binaries
       - run: node scripts/assemble-npm.mjs "${GITHUB_REF_NAME#v}" binaries dist-npm
-      - run: tar czf npm-packages.tar.gz -C dist-npm .
-      - run: gh release create "$GITHUB_REF_NAME" npm-packages.tar.gz --title "$GITHUB_REF_NAME" --generate-notes
+      # Publish on the workflow's OIDC identity (npm trusted publishing). Platform
+      # packages first, wrapper last so it never references a version that isn't up
+      # yet. No token, no OTP; npm attaches provenance automatically.
+      - run: |
+          for p in dist-npm/overrule-*; do (cd "$p" && npm publish --provenance --access public); done
+          (cd dist-npm/overrule && npm publish --provenance --access public)
+      - run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
