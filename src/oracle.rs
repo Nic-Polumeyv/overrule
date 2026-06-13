@@ -3,7 +3,7 @@
 //! trait exists so the stylesheet-derived oracle can replace the name-based
 //! tables, same seam as the npm package.
 
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 /// Decides which tokens in a class string lose to a later token.
 pub trait Oracle {
@@ -33,21 +33,71 @@ impl Oracle for TwFuseOracle {
         // tailwind-fuse (0.3.2) only parses the v3 leading-! position, so a
         // v4 trailing ! reads as a plain class and wrongly contests its
         // normal siblings. Rewrite each token to the spelling fuse parses,
-        // judge in that space, and report the originals.
+        // judge in that space, and report the originals. Most literals have
+        // no ! anywhere, and that case needs no parsing and no rewrite
+        // buffer, just the merge itself.
+        if !classes.contains('!') {
+            let merged = tailwind_fuse::merge::tw_merge(classes);
+            let kept: FxHashSet<&str> = merged.split(' ').collect();
+            let mut seen = FxHashSet::default();
+            return classes
+                .split_whitespace()
+                .filter(|token| seen.insert(*token) && !kept.contains(token))
+                .map(str::to_string)
+                .collect();
+        }
         let tokens: Vec<&str> = classes.split_whitespace().collect();
         let rewritten: Vec<String> = tokens
             .iter()
             .map(|token| leading_important(token))
             .collect();
         let merged = tailwind_fuse::merge::tw_merge(rewritten.join(" "));
-        let kept: HashSet<&str> = merged.split(' ').collect();
-        let mut seen = HashSet::new();
+        let kept: FxHashSet<&str> = merged.split(' ').collect();
+        let mut seen = FxHashSet::default();
         tokens
             .iter()
             .zip(&rewritten)
             .filter(|(token, rewrite)| seen.insert(**token) && !kept.contains(rewrite.as_str()))
             .map(|(token, _)| token.to_string())
             .collect()
+    }
+}
+
+/// Memoizes any oracle. A verdict is a pure function of the class string,
+/// so judging the same literal twice is wasted work, and component-heavy
+/// codebases repeat literals constantly (every copy of a shadcn button is
+/// the same strings again). RwLock over a map: hits take the read lock,
+/// which parallel scan threads share without contention.
+pub struct Memo<O> {
+    inner: O,
+    cache: std::sync::RwLock<rustc_hash::FxHashMap<String, Vec<String>>>,
+}
+
+impl<O: Oracle> Memo<O> {
+    pub fn new(inner: O) -> Self {
+        Self {
+            inner,
+            cache: std::sync::RwLock::new(rustc_hash::FxHashMap::default()),
+        }
+    }
+}
+
+impl<O: Oracle> Oracle for Memo<O> {
+    fn losers(&self, classes: &str) -> Vec<String> {
+        if let Some(hit) = self
+            .cache
+            .read()
+            .expect("no panics under the lock")
+            .get(classes)
+        {
+            return hit.clone();
+        }
+        let verdict = self.inner.losers(classes);
+        self.cache
+            .write()
+            .expect("no panics under the lock")
+            .insert(classes.to_string(), verdict.clone());
+        verdict
     }
 }
 
@@ -107,6 +157,24 @@ mod tests {
     fn same_modifier_bucket_conflicts() {
         let oracle = TwFuseOracle;
         assert_eq!(oracle.losers("sm:p-4 sm:p-6"), ["sm:p-4"]);
+    }
+
+    #[test]
+    fn memo_judges_each_distinct_literal_once() {
+        let calls = std::cell::Cell::new(0);
+        let counting = |classes: &str| {
+            calls.set(calls.get() + 1);
+            classes
+                .split_whitespace()
+                .filter(|t| *t == "loser")
+                .map(str::to_string)
+                .collect()
+        };
+        let memo = Memo::new(counting);
+        assert_eq!(memo.losers("a loser"), ["loser"]);
+        assert_eq!(memo.losers("a loser"), ["loser"]);
+        assert_eq!(memo.losers("clean enough"), Vec::<String>::new());
+        assert_eq!(calls.get(), 2);
     }
 
     #[test]

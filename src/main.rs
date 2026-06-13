@@ -14,8 +14,13 @@ use serde_json::json;
 
 use overrule::bridge::compile_candidates;
 use overrule::css::{CompiledCandidates, CssOracle, TypoOracle};
-use overrule::oracle::{Oracle, TwFuseOracle};
+use overrule::oracle::{Memo, Oracle, TwFuseOracle};
 use overrule::scan::{Finding, apply_fixes, scan_paths};
+
+// The scanner's hot loop allocates a String per kept token per literal;
+// mimalloc's thread-local heaps make that markedly cheaper under rayon.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[derive(Parser)]
 #[command(
@@ -166,7 +171,7 @@ fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
                 return ExitCode::FAILURE;
             }
         },
-        None => (Box::new(TwFuseOracle), None),
+        None => (Box::new(Memo::new(TwFuseOracle)), None),
     };
 
     let findings = scan_paths(&args.paths, oracle.as_ref());
@@ -300,7 +305,7 @@ fn cross(args: CrossArgs) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let tables = scan_paths(&args.scan.paths, &TwFuseOracle);
+    let tables = scan_paths(&args.scan.paths, &Memo::new(TwFuseOracle));
     let sheet = scan_paths(&args.scan.paths, &css_oracle);
 
     // A closure capturing `entries` mutably would hold that borrow for its
