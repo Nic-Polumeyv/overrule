@@ -10,5 +10,6 @@
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["runtime"]
+	"include": ["runtime"],
+	"exclude": ["runtime/**/*.test.ts"]
 }

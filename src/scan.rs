@@ -1,5 +1,6 @@
-//! Walker and literal extraction: class attributes and cn/cx/clsx/tv/cva call
-//! arguments, template literals without interpolation. The scanner sees single
+//! Walker and literal extraction: class attributes and
+//! cn/cx/clsx/tv/cva/declareVariants call arguments, template literals without
+//! interpolation. The scanner sees single
 //! literals only; caller-vs-component conflicts only exist at runtime, which
 //! is the npm package's guard's job.
 
@@ -124,7 +125,7 @@ fn without_losers(literal: &str, dropped: &[String]) -> String {
 static ATTR_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"\bclass(?:Name)?=(?:"([^"']+)"|'([^"']+)')"#).unwrap());
 static CALL_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\b(?:cn|cx|clsx|tv|cva)\s*\(").unwrap());
+    LazyLock::new(|| Regex::new(r"\b(?:cn|cx|clsx|tv|cva|declareVariants)\s*\(").unwrap());
 
 /// Collect string literals inside a call's balanced parens, at any nesting
 /// depth. Byte indices are safe: every delimiter is ASCII and an ASCII byte in
@@ -303,5 +304,18 @@ mod tests {
             without_losers("p-2 m-1 p-2 m-2", &["m-1".to_string()]),
             "p-2 m-2"
         );
+    }
+
+    #[test]
+    fn declare_variants_config_objects_are_scanned_like_cva() {
+        // declareVariants takes a config object like tv and cva. The collector
+        // is depth-agnostic, so the nested variant strings are reached and the
+        // call name in the regex is the whole change.
+        let findings = scan_source(
+            "declareVariants({ variants: { size: { sm: 'a loser b' } } })",
+            &fake,
+        );
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].dropped, ["loser"]);
     }
 }

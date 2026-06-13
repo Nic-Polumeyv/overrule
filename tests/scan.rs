@@ -70,3 +70,13 @@ fn fix_rewrites_to_merged_form_and_a_second_scan_is_clean() {
     assert!(fixed_svelte.contains("px-2 text-sm"));
     assert!(fixed_svelte.contains("rounded-md border"));
 }
+
+#[test]
+fn declare_variants_config_objects_are_scanned_self_conflicts_reported() {
+    // Inline, not a fixture file: tests/fixtures is scanned wholesale by the cli
+    // tests, which assert an exact finding count, so a fixture here would break them.
+    let src = "export const b = declareVariants({ variants: { size: { sm: 'px-2 px-4' } } });";
+    let findings = scan_source(src, &TwFuseOracle);
+    assert_eq!(findings.len(), 1, "findings: {findings:?}");
+    assert_eq!(findings[0].dropped, ["px-2"]);
+}
