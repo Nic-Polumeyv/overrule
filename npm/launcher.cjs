@@ -9,7 +9,7 @@ const PACKAGES = {
 	'linux-arm64': 'overrule-linux-arm64',
 	'darwin-x64': 'overrule-darwin-x64',
 	'darwin-arm64': 'overrule-darwin-arm64',
-	'win32-x64': 'overrule-win32-x64',
+	'win32-x64': 'overrule-windows-x64',
 };
 
 const key = `${process.platform}-${process.arch}`;
