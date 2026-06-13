@@ -1,6 +1,7 @@
 import { defaultOracle, type Oracle } from './oracle.js';
 
 export { createTwMergeOracle, defaultOracle, type Oracle } from './oracle.js';
+export { declareVariants, type VariantProps } from './variants.js';
 
 export type ClassValue = ClassValue[] | Record<string, unknown> | string | number | bigint | null | boolean | undefined;
 
