@@ -3,7 +3,9 @@
 //! literals only; caller-vs-component conflicts only exist at runtime, which
 //! is the npm package's guard's job.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -100,9 +102,9 @@ struct Literal<'a> {
 /// their last occurrence. Same survivors tailwind-fuse keeps, so the rewrite
 /// cannot change a pixel; the test suite cross-checks this against tw_merge.
 fn without_losers(literal: &str, dropped: &[String]) -> String {
-    let losers: HashSet<&str> = dropped.iter().map(String::as_str).collect();
+    let losers: FxHashSet<&str> = dropped.iter().map(String::as_str).collect();
     let tokens: Vec<&str> = literal.split_whitespace().collect();
-    let mut last_index: HashMap<&str, usize> = HashMap::new();
+    let mut last_index: FxHashMap<&str, usize> = FxHashMap::default();
     for (index, token) in tokens.iter().enumerate() {
         last_index.insert(token, index);
     }
@@ -181,7 +183,7 @@ pub fn scan_source(src: &str, oracle: &dyn Oracle) -> Vec<Conflict> {
         literals.extend(literals_in_call(src, m.end() - 1));
     }
 
-    let mut seen = HashSet::new();
+    let mut seen = FxHashSet::default();
     let mut findings = Vec::new();
     for literal in literals {
         if !seen.insert(literal.start) {
