@@ -16,7 +16,7 @@ const TARGETS = {
 	'aarch64-unknown-linux-gnu': { name: 'overrule-linux-arm64', os: 'linux', cpu: 'arm64', bin: 'overrule' },
 	'x86_64-apple-darwin': { name: 'overrule-darwin-x64', os: 'darwin', cpu: 'x64', bin: 'overrule' },
 	'aarch64-apple-darwin': { name: 'overrule-darwin-arm64', os: 'darwin', cpu: 'arm64', bin: 'overrule' },
-	'x86_64-pc-windows-msvc': { name: 'overrule-win32-x64', os: 'win32', cpu: 'x64', bin: 'overrule.exe' },
+	'x86_64-pc-windows-msvc': { name: 'overrule-windows-x64', os: 'win32', cpu: 'x64', bin: 'overrule.exe' },
 };
 
 const REPO = { type: 'git', url: 'git+https://github.com/Nic-Polumeyv/overrule.git' };
