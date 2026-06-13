@@ -37,6 +37,7 @@ const tokens = [
 	'[&>svg]:size-4', '[&>svg]:size-5', '[&>svg]:hover:size-4', 'hover:[&>svg]:size-5',
 	'[padding:1rem]', '[--cell-size:3rem]',
 	'text-xsm', 'not-a-class', 'also-not-one', 'btn',
+	'border-bs-2', 'border', 'pbs-2',
 ];
 writeFileSync(join(here, 'asts.json'), JSON.stringify(dump(main, tokens), strip, '\t'));
 

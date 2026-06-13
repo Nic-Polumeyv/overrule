@@ -2513,5 +2513,109 @@
 	"text-xsm": [],
 	"not-a-class": [],
 	"also-not-one": [],
-	"btn": []
+	"btn": [],
+	"border-bs-2": [
+		{
+			"kind": "rule",
+			"selector": ".border-bs-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "border-block-start-style",
+					"value": "var(--tw-border-style)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "border-block-start-width",
+					"value": "2px",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-border-style",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "solid",
+					"important": false
+				}
+			]
+		}
+	],
+	"border": [
+		{
+			"kind": "rule",
+			"selector": ".border",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "border-style",
+					"value": "var(--tw-border-style)",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "border-width",
+					"value": "1px",
+					"important": false
+				}
+			]
+		},
+		{
+			"kind": "at-rule",
+			"name": "@property",
+			"params": "--tw-border-style",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "syntax",
+					"value": "\"*\"",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "inherits",
+					"value": "false",
+					"important": false
+				},
+				{
+					"kind": "declaration",
+					"property": "initial-value",
+					"value": "solid",
+					"important": false
+				}
+			]
+		}
+	],
+	"pbs-2": [
+		{
+			"kind": "rule",
+			"selector": ".pbs-2",
+			"nodes": [
+				{
+					"kind": "declaration",
+					"property": "padding-block-start",
+					"value": "calc(var(--spacing) * 2)",
+					"important": false
+				}
+			]
+		}
+	]
 }
