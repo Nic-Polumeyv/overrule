@@ -8,11 +8,12 @@ import { join, type ClassValue } from './index.js';
  * The class branch uses overrule's `join` (concatenate, never resolve), so
  * conflicting tokens are caught by guard()/the oracle, not silently merged away.
  *
- * mergeProps is platform-neutral by default: a merged `style` stays a JS style
- * object and no attribute is dropped, matching react-aria. Opt into framework
- * idioms (serialize style to a string, drop boolean attrs set to false, compose
- * DOM handlers) with options, or bake them into a merger via createMergeProps.
- * sveltePreset reproduces the bits-ui/Svelte behavior.
+ * `createMergeProps(options)` builds a merger. With no options it is platform-
+ * neutral: a merged `style` stays a JS style object and no attribute is dropped,
+ * matching react-aria. Opt into framework idioms by passing options — serialize
+ * style to a string (`styleAs: 'string'`), drop boolean attrs set to false
+ * (`dropFalseAttrs`), compose DOM handlers (`isEventHandler`). Framework-specific
+ * policy is the consumer's to assemble; overrule ships only the engine.
  */
 
 type Props = Record<string, unknown>;
@@ -235,26 +236,23 @@ function mergePropsImpl(args: readonly (Props | null | undefined)[], options: Me
 	return result;
 }
 
-/** Build a mergeProps configured with the given options. Pass sveltePreset for bits-ui/Svelte semantics. */
-export function createMergeProps(options: MergePropsOptions = {}) {
-	return function mergeProps<T extends (Props | null | undefined)[]>(
-		...args: T
-	): UnionToIntersection<TupleTypes<T>> & { style?: string | StyleObject } {
-		return mergePropsImpl(args, options) as UnionToIntersection<TupleTypes<T>> & { style?: string | StyleObject };
-	};
-}
-
-/** Platform-neutral prop merger: a merged `style` stays an object, no attribute is dropped, same-named functions are chained. */
-export const mergeProps = createMergeProps();
+/** A merged `style` is a string when the options serialize it (`styleAs: 'string'`), otherwise a style object. */
+type MergedStyle<O extends MergePropsOptions> = O extends { styleAs: 'string' } ? string : StyleObject;
 
 /**
- * Options reproducing Svelte/bits-ui prop-merging: a merged `style` is serialized
- * to a CSS string, `hidden`/`disabled` are dropped when set to false (Svelte keeps
- * them otherwise), and lowercase on* handlers (onclick) compose with preventDefault
- * while camelCase callbacks (onValueChange) are chained.
+ * Build a prop merger with the given options. With no options the merger is
+ * platform-neutral: a merged `style` stays an object, no attribute is dropped,
+ * and same-named functions are chained. Pass options to opt into framework
+ * idioms (`styleAs`, `dropFalseAttrs`, `isEventHandler`).
+ *
+ * The return type tracks the options: `styleAs: 'string'` types the merged
+ * `style` as a `string`, so the result spreads onto string-typed `style` props
+ * with no cast. Pass options as a literal (or `as const`) so the inference holds.
  */
-export const sveltePreset: MergePropsOptions = {
-	styleAs: 'string',
-	dropFalseAttrs: ['hidden', 'disabled'],
-	isEventHandler: (key) => key.length > 2 && key.startsWith('on') && key === key.toLowerCase(),
-};
+export function createMergeProps<const O extends MergePropsOptions = MergePropsOptions>(options: O = {} as O) {
+	return function mergeProps<T extends (Props | null | undefined)[]>(
+		...args: T
+	): UnionToIntersection<TupleTypes<T>> & { style?: MergedStyle<O> } {
+		return mergePropsImpl(args, options) as UnionToIntersection<TupleTypes<T>> & { style?: MergedStyle<O> };
+	};
+}

@@ -1,9 +1,7 @@
 import { test, expect } from 'bun:test';
 
 import {
-	mergeProps,
 	createMergeProps,
-	sveltePreset,
 	chain,
 	composeEventHandlers,
 	mergeStyles,
@@ -80,24 +78,28 @@ test('mergeStyles merges strings and objects with later values winning', () => {
 	expect(mergeStyles('color: red; margin: 0', { color: 'blue' }, null)).toEqual({ color: 'blue', margin: '0' });
 });
 
-// ---- mergeProps (neutral default) ----
+// ---- createMergeProps: neutral (no options) ----
 
 test('class strings are joined, not resolved', () => {
-	expect(mergeProps({ class: 'px-2' }, { class: 'px-4' }).class).toBe('px-2 px-4');
+	const merge = createMergeProps();
+	expect(merge({ class: 'px-2' }, { class: 'px-4' }).class).toBe('px-2 px-4');
 });
 
 test('className is joined too (React-shaped props)', () => {
-	expect(mergeProps({ className: 'a' }, { className: 'b' }).className).toBe('a b');
+	const merge = createMergeProps();
+	expect(merge({ className: 'a' }, { className: 'b' }).className).toBe('a b');
 });
 
 test('last value wins, but undefined does not clobber an earlier value', () => {
-	expect(mergeProps({ id: 'x' }, { id: 'y' }).id).toBe('y');
-	expect(mergeProps({ id: 'x' }, { id: undefined }).id).toBe('x');
+	const merge = createMergeProps();
+	expect(merge({ id: 'x' }, { id: 'y' }).id).toBe('y');
+	expect(merge({ id: 'x' }, { id: undefined }).id).toBe('x');
 });
 
-test('neutral mergeProps keeps style an object and chains functions', () => {
+test('with no options, style stays an object and functions are chained', () => {
+	const merge = createMergeProps();
 	const calls: string[] = [];
-	const merged = mergeProps(
+	const merged = merge(
 		{ style: 'color: red', onclick: () => calls.push('a') },
 		{ style: { fontWeight: 'bold' }, onclick: () => calls.push('b') },
 	);
@@ -107,26 +109,35 @@ test('neutral mergeProps keeps style an object and chains functions', () => {
 });
 
 test('symbol keys take the last defined value', () => {
+	const merge = createMergeProps();
 	const sym = Symbol('attach');
-	const merged = mergeProps({ [sym]: 1 }, { [sym]: 2 });
+	const merged = merge({ [sym]: 1 }, { [sym]: 2 });
 	expect((merged as Record<symbol, unknown>)[sym]).toBe(2);
 });
 
-// ---- sveltePreset ----
+// ---- createMergeProps: options ----
 
-test('sveltePreset serializes style to a string', () => {
-	const merge = createMergeProps(sveltePreset);
+test('styleAs:"string" serializes a merged style to CSS text', () => {
+	const merge = createMergeProps({ styleAs: 'string' });
 	expect(merge({ style: 'color: red' }, { style: { fontWeight: 'bold' } }).style).toBe('color: red; font-weight: bold;');
 });
 
-test('sveltePreset drops hidden/disabled when false but keeps them when true', () => {
-	const merge = createMergeProps(sveltePreset);
+test('styleAs:"string" types the merged style as string (no cast needed)', () => {
+	const merge = createMergeProps({ styleAs: 'string' });
+	const merged = merge({ style: 'color: red' }, { style: { fontWeight: 'bold' } });
+	// Type-level assertion: this only compiles under tsc if `merged.style` is `string | undefined`.
+	const style: string | undefined = merged.style;
+	expect(style).toBe('color: red; font-weight: bold;');
+});
+
+test('dropFalseAttrs removes keys that merge to false but keeps true', () => {
+	const merge = createMergeProps({ dropFalseAttrs: ['hidden', 'disabled'] });
 	expect(merge({ hidden: true }, { hidden: false })).not.toHaveProperty('hidden');
 	expect(merge({ disabled: false }, { disabled: true }).disabled).toBe(true);
 });
 
-test('sveltePreset composes lowercase on* handlers with preventDefault', () => {
-	const merge = createMergeProps(sveltePreset);
+test('isEventHandler composes matching handlers with preventDefault short-circuit', () => {
+	const merge = createMergeProps({ isEventHandler: (key) => key.length > 2 && key.startsWith('on') && key === key.toLowerCase() });
 	const calls: string[] = [];
 	const event = {
 		defaultPrevented: false,
@@ -147,8 +158,8 @@ test('sveltePreset composes lowercase on* handlers with preventDefault', () => {
 	expect(calls).toEqual(['first']);
 });
 
-test('sveltePreset chains camelCase callbacks (no preventDefault short-circuit)', () => {
-	const merge = createMergeProps(sveltePreset);
+test('functions a rule does not flag as handlers are chained (all called)', () => {
+	const merge = createMergeProps({ isEventHandler: (key) => key.length > 2 && key.startsWith('on') && key === key.toLowerCase() });
 	const calls: string[] = [];
 	const merged = merge(
 		{ onValueChange: () => calls.push('a') },
@@ -157,8 +168,6 @@ test('sveltePreset chains camelCase callbacks (no preventDefault short-circuit)'
 	(merged.onValueChange as () => void)();
 	expect(calls).toEqual(['a', 'b']);
 });
-
-// ---- createMergeProps with a custom handler rule ----
 
 test('createMergeProps honors a custom isEventHandler (React onClick)', () => {
 	const merge = createMergeProps({ isEventHandler: (key) => /^on[A-Z]/.test(key) });
