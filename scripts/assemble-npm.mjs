@@ -88,6 +88,7 @@ writeFileSync(
 			exports: {
 				'.': { types: './runtime/index.d.ts', default: './runtime/index.js' },
 				'./test': { types: './runtime/test.d.ts', default: './runtime/test.js' },
+				'./props': { types: './runtime/props.d.ts', default: './runtime/props.js' },
 			},
 			dependencies: { 'tailwind-merge': '^3.6.0' },
 			optionalDependencies: Object.fromEntries(Object.values(TARGETS).map((p) => [p.name, version])),
