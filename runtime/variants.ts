@@ -1,55 +1,67 @@
-/** A variants schema: each axis maps option names to class strings. */
-type VariantsSchema = Record<string, Record<string, string>>;
+export type VariantsSchema = Record<string, Record<string, string>>;
+
+export type VariantFn<S extends VariantsSchema> = (
+	props?: { [K in keyof S]?: keyof S[K] | null | undefined } & { class?: string },
+) => string;
 
 /**
  * Build a variants function from a config of class strings. No merging.
  *
- * The returned function takes one option per axis and joins base, the chosen
- * variant classes, and a trailing caller class into one string. It never
- * resolves conflicts, and that is the point. The strings are meant to be
- * disjoint: base and variants must not set the same property for the same
- * modifier prefix, so the join is the whole job and tailwind-merge ships
- * nowhere. Prove the disjointness with assertVariantsMergeFree in a test and
- * overrule check in CI.
- *
- * An axis left undefined falls back to defaultVariants. Pass null to opt an
- * axis out and it emits nothing. The caller class is appended last and is not
- * checked here; the dev guard and the CLI cover it.
- *
- *   const button = declareVariants({
- *     base: 'inline-flex items-center',
- *     variants: {
- *       variant: { solid: 'bg-primary text-white', ghost: 'bg-transparent' },
- *       size: { sm: 'h-8 px-2', lg: 'h-10 px-4' },
- *     },
- *     defaultVariants: { variant: 'solid', size: 'sm' },
- *   });
- *
- *   button();                          // base, solid, sm
- *   button({ size: 'lg' });            // base, solid, lg
- *   button({ variant: null });         // base, sm, no variant classes
- *   button({ class: 'rounded-full' }); // base, solid, sm, rounded-full
+ * The config is compiled once. Mutating base, variants, or defaultVariants
+ * after declareVariants(...) is called is unsupported.
  */
 export function declareVariants<S extends VariantsSchema>(config: {
 	base?: string;
 	variants?: S;
 	defaultVariants?: { [K in keyof S]?: keyof S[K] };
-}): (props?: { [K in keyof S]?: keyof S[K] | null | undefined } & { class?: string }) => string {
-	const variants = config.variants;
-	return (props) => {
-		let out = config.base ?? '';
-		if (variants) {
-			for (const axis in variants) {
-				const key = axis as keyof S;
-				const raw = props?.[key];
-				const selected = raw === undefined ? config.defaultVariants?.[key] : raw;
-				const classes = selected == null ? undefined : variants[key][selected as string];
-				if (classes) out += (out ? ' ' : '') + classes;
+}): VariantFn<S> {
+	const b = config.base ?? '';
+	const v = config.variants as Record<string, Record<string, string>> | undefined;
+
+	if (v == null) {
+		return (b
+			? ((p?: { class?: string }) => (p?.class ? b + ' ' + p.class : b))
+			: ((p?: { class?: string }) => p?.class ?? '')) as VariantFn<S>;
+	}
+
+	const d = (config.defaultVariants ?? {}) as Record<string, string | undefined>;
+	const a = Object.keys(v);
+	const n = a.length;
+	const m = new Array<Record<string, string>>(n);
+	const f = new Array<string | undefined>(n);
+
+	for (let i = 0; i < n; i++) {
+		const k = a[i]!;
+		m[i] = v[k]!;
+		f[i] = d[k];
+	}
+
+	let z = b;
+
+	for (let i = 0; i < n; i++) {
+		const s = f[i];
+		const x = s == null ? undefined : m[i]![s];
+		if (x) z += z ? ' ' + x : x;
+	}
+
+	return ((p?: Record<string, string | null | undefined> & { class?: string }) => {
+		if (p == null) return z;
+
+		let o = b;
+
+		for (let i = 0; i < n; i++) {
+			let s = p[a[i]!];
+			s = s === undefined ? f[i] : s;
+
+			if (s != null) {
+				const x = m[i]![s];
+				if (x) o += o ? ' ' + x : x;
 			}
 		}
-		if (props?.class) out += (out ? ' ' : '') + props.class;
-		return out;
-	};
+
+		const c = p.class;
+		return c ? (o ? o + ' ' + c : c) : o;
+	}) as VariantFn<S>;
 }
 
 /** Pull the axis props out of a variants function, without class. Use with typeof yourVariants. */

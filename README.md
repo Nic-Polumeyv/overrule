@@ -41,14 +41,15 @@ const cn = import.meta.env.DEV ? guard(join) : join;
 
 ### overrule/props
 
-`mergeProps` composes component prop objects without tailwind-merge, one layer up from `join`. Class strings go through `join`, so conflicts still surface through `guard` and the oracle instead of resolving silently. Style objects and strings merge, same-named functions compose or chain, everything else is last value wins.
+`createMergeProps(options)` builds a function that composes component prop objects without tailwind-merge, one layer up from `join`. Class strings go through `join`, so conflicts still surface through `guard` and the oracle instead of resolving silently. Style objects and strings merge, same-named functions compose or chain, everything else is last value wins.
 
 ```ts
-import { mergeProps } from 'overrule/props';
+import { createMergeProps } from 'overrule/props';
+const mergeProps = createMergeProps();
 const props = mergeProps({ class: 'px-2', onclick: open }, { class: 'px-4', onclick: track });
 ```
 
-It is neutral by default: a merged `style` stays an object, no attribute is dropped, functions are chained. `createMergeProps(options)` bakes a policy in, and `sveltePreset` reproduces the bits-ui behavior, where `style` serializes to a string, `hidden` and `disabled` drop when false, and lowercase `on*` handlers compose with preventDefault while camelCase callbacks chain. The primitives ship too: `composeEventHandlers`, `chain`, `mergeStyles`, `styleToObject`, `styleToString`. Nothing rides along as a dependency, because the CSS parse and serialize are inline.
+With no options the merger is platform-neutral: a merged `style` stays an object, no attribute is dropped, functions are chained. Options opt into framework idioms: `styleAs: 'string'` serializes `style` to a string, `dropFalseAttrs` removes named boolean attrs when they merge to false, and `isEventHandler` marks which same-named functions compose with preventDefault (the rest chain). Framework-specific policy — the Svelte/bits-ui combination, say — is the consumer's to assemble from these options; overrule ships only the engine. The primitives ship too: `composeEventHandlers`, `chain`, `mergeStyles`, `styleToObject`, `styleToString`. Nothing rides along as a dependency, because the CSS parse and serialize are inline.
 
 ## What moved, what stayed
 
