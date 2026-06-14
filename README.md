@@ -4,7 +4,7 @@ tailwind-merge as a dev tool, not a dependency. The CLI is Rust now.
 
 `check` reports class strings whose tokens fight and exits 1. `fix` rewrites each one to the form the merge would have produced, so it cannot change a pixel. `cross` compares the name tables against your compiled stylesheet and prints every disagreement. Same contract as the 0.3.x npm CLI, byte for byte where the engines agree: same text output, same JSON shapes, same exit codes, and ack snapshots interop both ways.
 
-The runtime half still ships from npm: `guard`, `join`, and the `overrule/test` assertions run inside your dev bundle, and that is JavaScript's turf. Their source lives at the [v0.3.1 tag](https://github.com/Nic-Polumeyv/overrule/tree/v0.3.1).
+The runtime half ships from the same npm package and stays JavaScript, because dev-bundle work is JavaScript's turf. See [Runtime](#runtime).
 
 ## Install
 
@@ -27,6 +27,28 @@ npx overrule cross src/ --ack acks.json       # CI gate: new disagreements only
 ```
 
 `--css` and `cross` compile your classes with Tailwind itself, so they need node plus tailwindcss and @tailwindcss/node, 4.2 or newer, reachable from the CSS entry's project or from the directory you run in. Plain `check` and `fix` need nothing.
+
+## Runtime
+
+The npm package is the JavaScript runtime too, and bundlers tree-shake it out of production the way they do tailwind-merge. Wire the guard in dev and it vanishes in prod:
+
+```ts
+import { join, guard } from 'overrule';
+const cn = import.meta.env.DEV ? guard(join) : join;
+```
+
+`join` concatenates clsx-style inputs and resolves nothing. `guard` wraps it and warns when a class string carries tokens that fight, so the conflict shows at dev time instead of leaving it to the cascade. `overrule/test` runs the same check in your suite through `assertMergeFree` and `assertVariantsMergeFree`. `declareVariants` builds a variant function from class strings with no merge engine behind it. The first three trace back to the [v0.3.1 tag](https://github.com/Nic-Polumeyv/overrule/tree/v0.3.1); the rest is newer.
+
+### overrule/props
+
+`mergeProps` composes component prop objects without tailwind-merge, one layer up from `join`. Class strings go through `join`, so conflicts still surface through `guard` and the oracle instead of resolving silently. Style objects and strings merge, same-named functions compose or chain, everything else is last value wins.
+
+```ts
+import { mergeProps } from 'overrule/props';
+const props = mergeProps({ class: 'px-2', onclick: open }, { class: 'px-4', onclick: track });
+```
+
+It is neutral by default: a merged `style` stays an object, no attribute is dropped, functions are chained. `createMergeProps(options)` bakes a policy in, and `sveltePreset` reproduces the bits-ui behavior, where `style` serializes to a string, `hidden` and `disabled` drop when false, and lowercase `on*` handlers compose with preventDefault while camelCase callbacks chain. The primitives ship too: `composeEventHandlers`, `chain`, `mergeStyles`, `styleToObject`, `styleToString`. Nothing rides along as a dependency, because the CSS parse and serialize are inline.
 
 ## What moved, what stayed
 
