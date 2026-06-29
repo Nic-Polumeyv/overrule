@@ -30,37 +30,85 @@ pub struct TwFuseOracle;
 
 impl Oracle for TwFuseOracle {
     fn losers(&self, classes: &str) -> Vec<String> {
-        // tailwind-fuse (0.3.2) only parses the v3 leading-! position, so a
-        // v4 trailing ! reads as a plain class and wrongly contests its
-        // normal siblings. Rewrite each token to the spelling fuse parses,
-        // judge in that space, and report the originals. Most literals have
-        // no ! anywhere, and that case needs no parsing and no rewrite
-        // buffer, just the merge itself.
-        if !classes.contains('!') {
-            let merged = tailwind_fuse::merge::tw_merge(classes);
-            let kept: FxHashSet<&str> = merged.split(' ').collect();
-            let mut seen = FxHashSet::default();
-            return classes
-                .split_whitespace()
-                .filter(|token| seen.insert(*token) && !kept.contains(token))
+        // tailwind-fuse 0.3.2 has no transition-behavior group: its collision
+        // table routes transition-discrete and transition-normal through the
+        // `["transition", ..]` catch-all to transition-property, so they wrongly
+        // knock out transition-* siblings that set a different property. Real
+        // tailwind-merge keeps the two apart. When a behavior token is present,
+        // judge it in a pass of its own, where it can only contest another
+        // behavior token, never a transition-property class. The substring guard
+        // keeps the overwhelming common literal on the untouched fast path.
+        if classes.contains("transition-discrete") || classes.contains("transition-normal") {
+            let tokens: Vec<&str> = classes.split_whitespace().collect();
+            let mut behavior = String::new();
+            let mut rest = String::new();
+            for token in &tokens {
+                let bucket = if is_transition_behavior(token) {
+                    &mut behavior
+                } else {
+                    &mut rest
+                };
+                if !bucket.is_empty() {
+                    bucket.push(' ');
+                }
+                bucket.push_str(token);
+            }
+            let mut lost: FxHashSet<String> = FxHashSet::default();
+            lost.extend(judge(&rest));
+            lost.extend(judge(&behavior));
+            let mut seen: FxHashSet<&str> = FxHashSet::default();
+            return tokens
+                .iter()
+                .copied()
+                .filter(|token| seen.insert(*token) && lost.contains(*token))
                 .map(str::to_string)
                 .collect();
         }
-        let tokens: Vec<&str> = classes.split_whitespace().collect();
-        let rewritten: Vec<String> = tokens
-            .iter()
-            .map(|token| leading_important(token))
-            .collect();
-        let merged = tailwind_fuse::merge::tw_merge(rewritten.join(" "));
+        judge(classes)
+    }
+}
+
+/// One pass of tailwind-fuse, returning the tokens it would remove, deduplicated
+/// and in first-appearance order.
+///
+/// tailwind-fuse 0.3.2 only parses the v3 leading-! position, so a v4 trailing !
+/// reads as a plain class and wrongly contests its normal siblings. Rewrite each
+/// token to the spelling fuse parses, judge in that space, and report the
+/// originals. Most literals have no ! anywhere, and that case needs no parsing
+/// and no rewrite buffer, just the merge itself.
+fn judge(classes: &str) -> Vec<String> {
+    if !classes.contains('!') {
+        let merged = tailwind_fuse::merge::tw_merge(classes);
         let kept: FxHashSet<&str> = merged.split(' ').collect();
         let mut seen = FxHashSet::default();
-        tokens
-            .iter()
-            .zip(&rewritten)
-            .filter(|(token, rewrite)| seen.insert(**token) && !kept.contains(rewrite.as_str()))
-            .map(|(token, _)| token.to_string())
-            .collect()
+        return classes
+            .split_whitespace()
+            .filter(|token| seen.insert(*token) && !kept.contains(token))
+            .map(str::to_string)
+            .collect();
     }
+    let tokens: Vec<&str> = classes.split_whitespace().collect();
+    let rewritten: Vec<String> = tokens
+        .iter()
+        .map(|token| leading_important(token))
+        .collect();
+    let merged = tailwind_fuse::merge::tw_merge(rewritten.join(" "));
+    let kept: FxHashSet<&str> = merged.split(' ').collect();
+    let mut seen = FxHashSet::default();
+    tokens
+        .iter()
+        .zip(&rewritten)
+        .filter(|(token, rewrite)| seen.insert(**token) && !kept.contains(rewrite.as_str()))
+        .map(|(token, _)| token.to_string())
+        .collect()
+}
+
+/// transition-discrete / transition-normal, under any variants or importance.
+/// tailwind-fuse 0.3.2 misfiles these as transition-property; the caller judges
+/// them apart so they never contest a real transition-property token.
+fn is_transition_behavior(token: &str) -> bool {
+    let base = crate::parse::parse(token).base;
+    base == "transition-discrete" || base == "transition-normal"
 }
 
 /// Memoizes any oracle. A verdict is a pure function of the class string,
@@ -157,6 +205,40 @@ mod tests {
     fn same_modifier_bucket_conflicts() {
         let oracle = TwFuseOracle;
         assert_eq!(oracle.losers("sm:p-4 sm:p-6"), ["sm:p-4"]);
+    }
+
+    #[test]
+    fn transition_behavior_is_not_transition_property() {
+        let oracle = TwFuseOracle;
+        // a behavior token never knocks out a transition-property sibling
+        // (fuse 0.3.2 would, lacking the transition-behavior group)
+        assert_eq!(
+            oracle.losers("transition-[opacity,translate,display,overlay] transition-discrete"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            oracle.losers("transition-all transition-discrete"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            oracle.losers("transition-discrete transition-colors"),
+            Vec::<String>::new()
+        );
+        // two behavior tokens still conflict, later wins
+        assert_eq!(
+            oracle.losers("transition-discrete transition-normal"),
+            ["transition-discrete"]
+        );
+        // transition-property tokens still conflict among themselves
+        assert_eq!(
+            oracle.losers("transition-all transition-discrete transition-colors"),
+            ["transition-all"]
+        );
+        // variants keep behavior tokens in their own buckets
+        assert_eq!(
+            oracle.losers("hover:transition-discrete transition-discrete"),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
