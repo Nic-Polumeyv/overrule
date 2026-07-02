@@ -79,9 +79,13 @@ mkdirSync(join(wrapper, 'bin'), { recursive: true });
 cpSync(join(root, 'npm/launcher.cjs'), join(wrapper, 'bin/overrule.cjs'));
 cpSync(join(root, 'README.md'), join(wrapper, 'README.md'));
 cpSync(join(root, 'LICENSE'), join(wrapper, 'LICENSE'));
-// The JS runtime half — join/guard/test run in consumers' dev bundles; the binary is
-// the CLI half. Built by `tsc -p tsconfig.runtime.json` into runtime-dist/.
-cpSync(join(root, 'runtime-dist'), join(wrapper, 'runtime'), { recursive: true });
+// The JS runtime half: join/guard/test run in consumers' dev bundles; the binary is
+// the CLI half. runtime/ is JS + hand-written d.ts, shipped as-is with no build
+// step; only the test files stay behind.
+cpSync(join(root, 'runtime'), join(wrapper, 'runtime'), {
+	recursive: true,
+	filter: (src) => !src.endsWith('.test.ts'),
+});
 writeFileSync(
 	join(wrapper, 'package.json'),
 	JSON.stringify(

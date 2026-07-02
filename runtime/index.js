@@ -1,26 +1,14 @@
-export type ClassValue = ClassValue[] | Record<string, unknown> | string | number | bigint | null | boolean | undefined;
-
-/**
- * A conflict oracle takes a class string and returns the tokens that lose.
- * An empty array means no token conflicts with another. The implementation
- * lives on overrule/map; the root entry stays free of it so importing join
- * pulls in no oracle at all.
- */
-export type Oracle = (classes: string) => string[];
-
-export type Conflict = {
-	/** The full class string that was checked. */
-	input: string;
-	/** Tokens the oracle would drop, meaning the cascade decides instead of you. */
-	dropped: string[];
-};
+// Types live in index.d.ts, the hand-written public reference; this file
+// borrows them via import() so the two cannot use different shapes silently.
 
 /**
  * Plain class join with clsx-compatible inputs: strings, numbers, nested
  * arrays, and { class: condition } dictionaries. No merging, no conflict
  * resolution. Pair it with guard() in dev to keep it honest.
+ * @param {...import('./index.js').ClassValue} inputs
+ * @returns {string}
  */
-export function join(...inputs: ClassValue[]): string {
+export function join(...inputs) {
 	let out = '';
 	for (let i = 0; i < inputs.length; i++) out = append(out, inputs[i]);
 	return out;
@@ -30,7 +18,12 @@ export function join(...inputs: ClassValue[]): string {
 // symbols are dropped even though bigint sits in the type (clsx carries the
 // same types-vs-runtime quirk). Arrays recurse by index, so a huge flat array
 // never hits the engine's argument-spread limit.
-function append(out: string, input: ClassValue): string {
+/**
+ * @param {string} out
+ * @param {import('./index.js').ClassValue} input
+ * @returns {string}
+ */
+function append(out, input) {
 	if (!input || input === true) return out;
 
 	if (typeof input === 'string' || typeof input === 'number') {
@@ -51,15 +44,20 @@ function append(out: string, input: ClassValue): string {
 /**
  * Returns the tokens the oracle considers losers in a class string, or null
  * when nothing conflicts.
+ * @param {string} classes
+ * @param {import('./index.js').Oracle} oracle
+ * @returns {import('./index.js').Conflict | null}
  */
-export function findConflicts(classes: string, oracle: Oracle): Conflict | null {
+export function findConflicts(classes, oracle) {
 	const dropped = oracle(classes);
 	return dropped.length > 0 ? { input: classes, dropped } : null;
 }
 
-const reported = new Set<string>();
+/** @type {Set<string>} */
+const reported = new Set();
 
-function warnOnce(conflict: Conflict): void {
+/** @param {import('./index.js').Conflict} conflict */
+function warnOnce(conflict) {
 	// The input is part of the signature: different class strings can drop the
 	// same tokens, and each deserves its own warning.
 	const signature = conflict.input + '\n' + [...conflict.dropped].sort().join(' ');
@@ -82,33 +80,31 @@ function warnOnce(conflict: Conflict): void {
  *
  * The map comes from `overrule map`, so the verdicts come from your own
  * compiled stylesheet. The dev-only branch keeps all of it out of production.
+ * @template {(...args: never[]) => string} F
+ * @param {F} joinFn
+ * @param {import('./index.js').Oracle} oracle
+ * @param {(conflict: import('./index.js').Conflict) => void} [onConflict]
+ * @returns {F}
  */
-export function guard<F extends (...args: never[]) => string>(
-	joinFn: F,
-	oracle: Oracle,
-	onConflict: (conflict: Conflict) => void = warnOnce,
-): F {
-	const guarded = (...args: never[]): string => {
+export function guard(joinFn, oracle, onConflict = warnOnce) {
+	/** @type {(...args: never[]) => string} */
+	const guarded = (...args) => {
 		const out = joinFn(...args);
 		const conflict = findConflicts(out, oracle);
 		if (conflict) onConflict(conflict);
 		return out;
 	};
-	return guarded as F;
+	return /** @type {F} */ (guarded);
 }
-
-export type VariantsSchema = Record<string, Record<string, string>>;
-
-/** An axis keyed 'true'/'false' accepts real booleans, the way cva types it. */
-type AxisValue<V> = V extends 'true' | 'false' ? boolean | V : V;
-
-export type VariantFn<S extends VariantsSchema> = (
-	props?: { [K in keyof S]?: AxisValue<keyof S[K]> | null | undefined } & { class?: string },
-) => string;
 
 // Own-property lookup: a selection like 'toString' must select nothing, not
 // walk the prototype chain and inject function source into the class string.
-function pick(m: Record<string, string>, s: string | boolean): string | undefined {
+/**
+ * @param {Record<string, string>} m
+ * @param {string | boolean} s
+ * @returns {string | undefined}
+ */
+function pick(m, s) {
 	const k = typeof s === 'boolean' ? String(s) : s;
 	return Object.hasOwn(m, k) ? m[k] : undefined;
 }
@@ -118,12 +114,11 @@ function pick(m: Record<string, string>, s: string | boolean): string | undefine
  *
  * The config is compiled once. Mutating base, variants, or defaultVariants
  * after declareVariants(...) is called is unsupported.
+ * @template {import('./index.js').VariantsSchema} S
+ * @param {import('./index.js').VariantsConfig<S>} config
+ * @returns {import('./index.js').VariantFn<S>}
  */
-export function declareVariants<S extends VariantsSchema>(config: {
-	base?: string;
-	variants?: S;
-	defaultVariants?: { [K in keyof S]?: AxisValue<keyof S[K]> | null };
-}): VariantFn<S> {
+export function declareVariants(config) {
 	// Unsupported config fails loudly instead of silently dropping styling.
 	// The type layer already rejects it; this catches untyped callers.
 	for (const key in config) {
@@ -133,23 +128,27 @@ export function declareVariants<S extends VariantsSchema>(config: {
 	}
 
 	const b = config.base ?? '';
-	const v = config.variants as Record<string, Record<string, string>> | undefined;
+	const v = /** @type {Record<string, Record<string, string>> | undefined} */ (config.variants);
 
 	if (v == null) {
-		return (b
-			? ((p?: { class?: string }) => (p?.class ? b + ' ' + p.class : b))
-			: ((p?: { class?: string }) => p?.class ?? '')) as VariantFn<S>;
+		return /** @type {import('./index.js').VariantFn<S>} */ (
+			b
+				? (/** @type {{ class?: string } | undefined} */ p) => (p?.class ? b + ' ' + p.class : b)
+				: (/** @type {{ class?: string } | undefined} */ p) => p?.class ?? ''
+		);
 	}
 
-	const d = (config.defaultVariants ?? {}) as Record<string, string | boolean | null | undefined>;
+	const d = /** @type {Record<string, string | boolean | null | undefined>} */ (config.defaultVariants ?? {});
 	const a = Object.keys(v);
 	const n = a.length;
-	const m = new Array<Record<string, string>>(n);
-	const f = new Array<string | boolean | null | undefined>(n);
+	/** @type {Record<string, string>[]} */
+	const m = new Array(n);
+	/** @type {(string | boolean | null | undefined)[]} */
+	const f = new Array(n);
 
 	for (let i = 0; i < n; i++) {
-		const k = a[i]!;
-		m[i] = v[k]!;
+		const k = a[i];
+		m[i] = v[k];
 		f[i] = d[k];
 	}
 
@@ -157,30 +156,28 @@ export function declareVariants<S extends VariantsSchema>(config: {
 
 	for (let i = 0; i < n; i++) {
 		const s = f[i];
-		const x = s == null ? undefined : pick(m[i]!, s);
+		const x = s == null ? undefined : pick(m[i], s);
 		if (x) z += z ? ' ' + x : x;
 	}
 
-	return ((p?: Record<string, string | boolean | null | undefined> & { class?: string }) => {
-		if (p == null) return z;
+	return /** @type {import('./index.js').VariantFn<S>} */ (
+		(/** @type {(Record<string, string | boolean | null | undefined> & { class?: string }) | undefined} */ p) => {
+			if (p == null) return z;
 
-		let o = b;
+			let o = b;
 
-		for (let i = 0; i < n; i++) {
-			let s = p[a[i]!];
-			s = s === undefined ? f[i] : s;
+			for (let i = 0; i < n; i++) {
+				let s = p[a[i]];
+				s = s === undefined ? f[i] : s;
 
-			if (s != null) {
-				const x = pick(m[i]!, s);
-				if (x) o += o ? ' ' + x : x;
+				if (s != null) {
+					const x = pick(m[i], s);
+					if (x) o += o ? ' ' + x : x;
+				}
 			}
+
+			const c = p.class;
+			return c ? (o ? o + ' ' + c : c) : o;
 		}
-
-		const c = p.class;
-		return c ? (o ? o + ' ' + c : c) : o;
-	}) as VariantFn<S>;
+	);
 }
-
-/** Pull the axis props out of a variants function, without class. Use with typeof yourVariants. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type VariantProps<T extends (props?: any) => string> = Omit<NonNullable<Parameters<T>[0]>, 'class'>;

@@ -4,9 +4,9 @@
 		"module": "esnext",
 		"moduleResolution": "bundler",
 		"strict": true,
-		"declaration": true,
-		"rootDir": "runtime",
-		"outDir": "runtime-dist",
+		"allowJs": true,
+		"checkJs": true,
+		"noEmit": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true
 	},

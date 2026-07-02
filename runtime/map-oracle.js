@@ -1,27 +1,5 @@
-import type { Oracle } from './index.js';
-
-/**
- * One compiled declaration group of a token. The bucket encodes the full
- * condition context (media queries, variants, pseudo pinning, importance)
- * as an opaque key; equality is its only operation, never parse it.
- */
-export type DeclarationGroup = {
-	bucket: string;
-	/** CSS properties the group declares. Custom properties ("--x") count like any other. */
-	props: readonly string[];
-};
-
-/**
- * The conflict map `overrule map` emits: every token in the project compiled
- * with the real stylesheet. `covers` lists shorthand relationships: a kept
- * declaration of property P also beats declarations of every property in
- * covers[P] within the same bucket.
- */
-export type ConflictMap = {
-	version: 1;
-	covers: Record<string, readonly string[]>;
-	tokens: Record<string, readonly DeclarationGroup[]>;
-};
+// Types live in map-oracle.d.ts, the hand-written public reference; this file
+// borrows them via import() so the two cannot use different shapes silently.
 
 /**
  * An oracle judged by a conflict map instead of tailwind-merge's name tables,
@@ -31,8 +9,10 @@ export type ConflictMap = {
  * by a kept token. Unknown tokens are never dropped and claim nothing; the
  * map has no evidence about them. Dropped tokens claim nothing either: their
  * declarations lost, so they beat nobody.
+ * @param {import('./map-oracle.js').ConflictMap} map
+ * @returns {import('./index.js').Oracle}
  */
-export function createMapOracle(map: ConflictMap): Oracle {
+export function createMapOracle(map) {
 	if (map.version !== 1) {
 		throw new Error(
 			`unsupported conflict map version ${JSON.stringify(map.version)}: this runtime reads version 1, regenerate with \`overrule map\``,
@@ -45,18 +25,23 @@ export function createMapOracle(map: ConflictMap): Oracle {
 		// A repeated token judges from its LAST occurrence, the instance the
 		// cascade actually reads, so "p-2 p-4 p-2" drops p-4.
 		const raw = classes.split(/\s+/).filter((token) => token !== '');
-		const last = new Map<string, number>();
-		for (let i = 0; i < raw.length; i++) last.set(raw[i]!, i);
-		const walk = [...last.keys()].sort((a, b) => last.get(a)! - last.get(b)!);
+		/** @type {Map<string, number>} */
+		const last = new Map();
+		for (let i = 0; i < raw.length; i++) last.set(raw[i], i);
+		const walk = [...last.keys()].sort(
+			(a, b) => /** @type {number} */ (last.get(a)) - /** @type {number} */ (last.get(b)),
+		);
 		// claimed: bucket -> properties won by kept tokens to the right.
-		const claimed = new Map<string, Set<string>>();
-		const dropped = new Set<string>();
+		/** @type {Map<string, Set<string>>} */
+		const claimed = new Map();
+		/** @type {Set<string>} */
+		const dropped = new Set();
 
 		for (let i = walk.length - 1; i >= 0; i--) {
-			const token = walk[i]!;
+			const token = walk[i];
 			// Object.hasOwn: the map is parsed JSON, so a token named "toString"
 			// must not resolve through Object.prototype.
-			const groups = Object.hasOwn(tokens, token) ? tokens[token]! : undefined;
+			const groups = Object.hasOwn(tokens, token) ? tokens[token] : undefined;
 			if (groups === undefined) continue;
 
 			let declares = false;
@@ -79,7 +64,7 @@ export function createMapOracle(map: ConflictMap): Oracle {
 				if (won === undefined) claimed.set(group.bucket, (won = new Set()));
 				for (const prop of group.props) {
 					won.add(prop);
-					if (Object.hasOwn(covers, prop)) for (const covered of covers[prop]!) won.add(covered);
+					if (Object.hasOwn(covers, prop)) for (const covered of covers[prop]) won.add(covered);
 				}
 			}
 		}
