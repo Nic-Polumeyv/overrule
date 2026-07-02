@@ -122,6 +122,7 @@ fn a_snapshot_silences_known_disagreements_anything_new_exits_1() {
         out.contains("no new disagreements, 1 acknowledged"),
         "out: {out}"
     );
+    assert!(!out.contains("matched nothing"), "out: {out}");
 
     fs::write(&ack_path, "{\"disagreements\": []}").unwrap();
     let (code, out, _) = run(
@@ -170,6 +171,98 @@ fn an_ack_follows_the_literal_across_files_and_lines() {
         out.contains("no new disagreements, 1 acknowledged"),
         "out: {out}"
     );
+}
+
+/// A snapshot for the leading-snug fixture plus one entry whose disagreement
+/// no longer exists, the shape a snapshot decays into as oracles get fixed.
+fn snapshot_with_a_stale_entry(dir: &Path, target: &str) -> PathBuf {
+    let (code, out, err) = run(&["cross", target, "--json"], &root(), false);
+    assert_eq!(code, 0, "stderr: {err}");
+    let mut snapshot: serde_json::Value = serde_json::from_str(&out).expect("valid json");
+    snapshot["disagreements"]
+        .as_array_mut()
+        .expect("disagreements array")
+        .push(serde_json::json!({
+            "file": "gone.svelte",
+            "line": 1,
+            "literal": "px-9 px-8",
+            "tables": ["px-9"],
+            "sheet": ["px-9"],
+        }));
+    let ack_path = dir.join("acks.json");
+    fs::write(&ack_path, snapshot.to_string()).unwrap();
+    ack_path
+}
+
+#[test]
+fn a_stale_ack_entry_gets_a_prune_hint_and_does_not_fail_the_run() {
+    if !tailwind_installed() {
+        eprintln!("skipped: run `bun install` so the bridge can resolve tailwindcss");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("demo.svelte"),
+        "<div class=\"leading-snug text-xs\">x</div>\n",
+    )
+    .unwrap();
+    let target = dir.path().to_str().unwrap();
+    let ack_path = snapshot_with_a_stale_entry(dir.path(), target);
+
+    let (code, out, _) = run(
+        &["cross", target, "--ack", ack_path.to_str().unwrap()],
+        &root(),
+        false,
+    );
+    assert_eq!(code, 0, "out: {out}");
+    assert!(
+        out.contains("no new disagreements, 1 acknowledged"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("1 of 2 acknowledged entries matched nothing; prune them from"),
+        "out: {out}"
+    );
+    assert!(out.contains("acks.json"), "out: {out}");
+}
+
+#[test]
+fn stale_ack_entries_are_listed_in_json_matched_ones_are_not() {
+    if !tailwind_installed() {
+        eprintln!("skipped: run `bun install` so the bridge can resolve tailwindcss");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("demo.svelte"),
+        "<div class=\"leading-snug text-xs\">x</div>\n",
+    )
+    .unwrap();
+    let target = dir.path().to_str().unwrap();
+    let ack_path = snapshot_with_a_stale_entry(dir.path(), target);
+
+    let (code, out, _) = run(
+        &[
+            "cross",
+            target,
+            "--ack",
+            ack_path.to_str().unwrap(),
+            "--json",
+        ],
+        &root(),
+        false,
+    );
+    assert_eq!(code, 0, "out: {out}");
+    let data: serde_json::Value = serde_json::from_str(&out).expect("valid json");
+    assert_eq!(data["disagreements"].as_array().expect("array").len(), 0);
+    let stale = data["staleAcks"].as_array().expect("staleAcks array");
+    assert_eq!(stale.len(), 1);
+    assert_eq!(stale[0]["literal"], serde_json::json!("px-9 px-8"));
+
+    // Without --ack the output is the snapshot format; staleAcks stays out.
+    let (_, out, _) = run(&["cross", target, "--json"], &root(), false);
+    let data: serde_json::Value = serde_json::from_str(&out).expect("valid json");
+    assert!(data["staleAcks"].is_null(), "out: {out}");
 }
 
 #[test]

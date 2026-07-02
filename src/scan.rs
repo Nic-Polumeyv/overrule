@@ -179,8 +179,12 @@ fn literals_in_call(src: &str, open_paren: usize) -> Vec<Literal<'_>> {
     literals
 }
 
-/// Scan one source string for conflicting class literals.
-pub fn scan_source(src: &str, oracle: &dyn Oracle) -> Vec<Conflict> {
+/// Byte spans of the candidate literals in one source string: attribute
+/// matches first, call literals after, deduplicated by start offset,
+/// single-token strings dropped. Extraction is oracle-independent, so it
+/// happens once per file no matter how many oracles judge the result; spans
+/// instead of borrows let [`SourceFile`] own the source they point into.
+fn candidate_spans(src: &str) -> Vec<(usize, usize)> {
     let mut literals: Vec<Literal> = Vec::new();
 
     for cap in ATTR_RE.captures_iter(src) {
@@ -199,39 +203,100 @@ pub fn scan_source(src: &str, oracle: &dyn Oracle) -> Vec<Conflict> {
     }
 
     let mut seen = FxHashSet::default();
+    literals
+        .into_iter()
+        .filter(|literal| {
+            seen.insert(literal.start) && literal.content.split_whitespace().nth(1).is_some()
+        })
+        .map(|literal| (literal.start, literal.end))
+        .collect()
+}
+
+/// Judge pre-extracted literals against one oracle, in span order.
+fn judge_spans(src: &str, spans: &[(usize, usize)], oracle: &dyn Oracle) -> Vec<Conflict> {
     let mut findings = Vec::new();
-    for literal in literals {
-        if !seen.insert(literal.start) {
-            continue;
-        }
-        if literal.content.split_whitespace().nth(1).is_none() {
-            continue;
-        }
-        let dropped = oracle.losers(literal.content);
+    for &(start, end) in spans {
+        let content = &src[start..end];
+        let dropped = oracle.losers(content);
         if dropped.is_empty() {
             continue;
         }
         findings.push(Conflict {
-            line: src.as_bytes()[..literal.start]
+            line: src.as_bytes()[..start]
                 .iter()
                 .filter(|&&b| b == b'\n')
                 .count()
                 + 1,
-            literal: literal.content.to_string(),
-            fixed: without_losers(literal.content, &dropped),
+            literal: content.to_string(),
+            fixed: without_losers(content, &dropped),
             dropped,
-            start: literal.start,
-            end: literal.end,
+            start,
+            end,
         });
     }
     findings
 }
 
-/// Scan files and directories. Unreadable files are skipped. Files are judged
-/// in parallel; rayon's ordered collect keeps findings in walk order, so the
-/// output is deterministic and matches the npm CLI. This is the part a
-/// JavaScript scanner cannot do without worker ceremony, and the reason the
-/// oracle trait demands Sync.
+/// Scan one source string for conflicting class literals.
+pub fn scan_source(src: &str, oracle: &dyn Oracle) -> Vec<Conflict> {
+    judge_spans(src, &candidate_spans(src), oracle)
+}
+
+/// A file read from disk with its candidate literals already extracted.
+/// check --css and cross judge the same tree with several oracles; reading
+/// and extracting up front is what keeps that one walk instead of one per
+/// oracle.
+pub struct SourceFile {
+    file: PathBuf,
+    src: String,
+    literals: Vec<(usize, usize)>,
+}
+
+/// Walk, read, and extract each file once. Unreadable files are skipped.
+/// Files keep walk order, so every judging pass over the result reports in
+/// the same alphabetical file order as the npm CLI.
+pub fn read_paths(paths: &[PathBuf]) -> Vec<SourceFile> {
+    use rayon::prelude::*;
+    let files: Vec<PathBuf> = paths.iter().flat_map(|path| walk(path)).collect();
+    files
+        .into_par_iter()
+        .filter_map(|file| {
+            let src = fs::read_to_string(&file).ok()?;
+            let literals = candidate_spans(&src);
+            Some(SourceFile {
+                file,
+                src,
+                literals,
+            })
+        })
+        .collect()
+}
+
+/// Judge extracted files with one oracle. Files are judged in parallel;
+/// rayon's ordered collect keeps findings in walk order, so the output is
+/// deterministic and matches the npm CLI. This is the part a JavaScript
+/// scanner cannot do without worker ceremony, and the reason the oracle
+/// trait demands Sync.
+pub fn scan_files(files: &[SourceFile], oracle: &(dyn Oracle + Sync)) -> Vec<Finding> {
+    use rayon::prelude::*;
+    files
+        .par_iter()
+        .flat_map(|source| {
+            judge_spans(&source.src, &source.literals, oracle)
+                .into_iter()
+                .map(|conflict| Finding {
+                    file: source.file.clone(),
+                    conflict,
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Scan files and directories with a single oracle. Fused on purpose rather
+/// than composed from [`read_paths`] and [`scan_files`]: one oracle has no
+/// reuse for the retained sources, and the corpus indirection costs
+/// measurable wall time on big trees. Same walk, same order, same skips.
 pub fn scan_paths(paths: &[PathBuf], oracle: &(dyn Oracle + Sync)) -> Vec<Finding> {
     use rayon::prelude::*;
     let files: Vec<PathBuf> = paths.iter().flat_map(|path| walk(path)).collect();

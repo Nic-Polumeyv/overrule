@@ -15,7 +15,7 @@ use serde_json::json;
 use overrule::bridge::compile_candidates;
 use overrule::css::{CompiledCandidates, CssOracle, TypoOracle};
 use overrule::oracle::{Memo, Oracle, TwFuseOracle};
-use overrule::scan::{Finding, apply_fixes, scan_paths};
+use overrule::scan::{Finding, SourceFile, apply_fixes, read_paths, scan_files, scan_paths};
 
 // The scanner's hot loop allocates a String per kept token per literal;
 // mimalloc's thread-local heaps make that markedly cheaper under rayon.
@@ -105,11 +105,11 @@ impl Oracle for TokenCollector {
 /// Compile every token the scan will encounter, once, and build both
 /// stylesheet oracles from the result.
 fn css_oracles(
-    paths: &[PathBuf],
+    files: &[SourceFile],
     css_entry: Option<&PathBuf>,
 ) -> Result<(CssOracle, TypoOracle), String> {
     let collector = TokenCollector::default();
-    scan_paths(paths, &collector);
+    scan_files(files, &collector);
     let mut tokens: Vec<String> = collector
         .0
         .into_inner()
@@ -163,21 +163,26 @@ fn display(finding: &Finding) -> String {
 }
 
 fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
-    let (oracle, typos): (Box<dyn Oracle + Sync>, Option<TypoOracle>) = match &args.css {
-        Some(entry) => match css_oracles(&args.paths, Some(entry)) {
-            Ok((oracle, typos)) => (Box::new(oracle), Some(typos)),
-            Err(message) => {
-                eprintln!("{message}");
-                return ExitCode::FAILURE;
+    // The stylesheet path judges the tree three times: token collection for
+    // the compile batch, conflicts, typos. Each file is read and extracted
+    // once and all three passes judge that corpus. The tables path judges
+    // once, so it keeps the fused single pass.
+    let (findings, unknowns) = match &args.css {
+        Some(entry) => {
+            let files = read_paths(&args.paths);
+            match css_oracles(&files, Some(entry)) {
+                Ok((oracle, typos)) => (scan_files(&files, &oracle), scan_files(&files, &typos)),
+                Err(message) => {
+                    eprintln!("{message}");
+                    return ExitCode::FAILURE;
+                }
             }
-        },
-        None => (Box::new(Memo::new(TwFuseOracle)), None),
+        }
+        None => (
+            scan_paths(&args.paths, &Memo::new(TwFuseOracle)),
+            Vec::new(),
+        ),
     };
-
-    let findings = scan_paths(&args.paths, oracle.as_ref());
-    let unknowns = typos
-        .map(|t| scan_paths(&args.paths, &t))
-        .unwrap_or_default();
 
     if args.json {
         if fixing && let Err(e) = apply_fixes(&findings) {
@@ -298,15 +303,16 @@ fn verdict(dropped: Option<&Vec<String>>) -> String {
 }
 
 fn cross(args: CrossArgs) -> ExitCode {
-    let (css_oracle, _) = match css_oracles(&args.scan.paths, args.scan.css.as_ref()) {
+    let files = read_paths(&args.scan.paths);
+    let (css_oracle, _) = match css_oracles(&files, args.scan.css.as_ref()) {
         Ok(oracles) => oracles,
         Err(message) => {
             eprintln!("{message}");
             return ExitCode::FAILURE;
         }
     };
-    let tables = scan_paths(&args.scan.paths, &Memo::new(TwFuseOracle));
-    let sheet = scan_paths(&args.scan.paths, &css_oracle);
+    let tables = scan_files(&files, &Memo::new(TwFuseOracle));
+    let sheet = scan_files(&files, &css_oracle);
 
     // A closure capturing `entries` mutably would hold that borrow for its
     // whole lifetime and block the field writes below, so this is a plain fn
@@ -356,6 +362,8 @@ fn cross(args: CrossArgs) -> ExitCode {
     };
 
     let mut acknowledged = 0;
+    let mut ack_total = 0;
+    let mut stale: Vec<serde_json::Value> = Vec::new();
     if let Some(ack_file) = &args.ack {
         let parsed: serde_json::Value = match std::fs::read_to_string(ack_file)
             .map_err(|e| e.to_string())
@@ -372,29 +380,36 @@ fn cross(args: CrossArgs) -> ExitCode {
         } else {
             &parsed["disagreements"]
         };
-        let known: HashSet<String> = list
-            .as_array()
-            .map(|entries| {
-                entries
-                    .iter()
-                    .map(|entry| {
-                        let strings = |key: &str| -> Option<Vec<String>> {
-                            entry[key].as_array().map(|tokens| {
-                                tokens
-                                    .iter()
-                                    .filter_map(|t| t.as_str().map(str::to_string))
-                                    .collect()
-                            })
-                        };
-                        signature(
-                            entry["literal"].as_str().unwrap_or(""),
-                            strings("tables").as_ref(),
-                            strings("sheet").as_ref(),
-                        )
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let entry_signature = |entry: &serde_json::Value| {
+            let strings = |key: &str| -> Option<Vec<String>> {
+                entry[key].as_array().map(|tokens| {
+                    tokens
+                        .iter()
+                        .filter_map(|t| t.as_str().map(str::to_string))
+                        .collect()
+                })
+            };
+            signature(
+                entry["literal"].as_str().unwrap_or(""),
+                strings("tables").as_ref(),
+                strings("sheet").as_ref(),
+            )
+        };
+        let entries: &[serde_json::Value] = list.as_array().map(Vec::as_slice).unwrap_or(&[]);
+        ack_total = entries.len();
+        let known: HashSet<String> = entries.iter().map(entry_signature).collect();
+        // An entry that matches no current disagreement is a disagreement
+        // that no longer exists. It gets reported so snapshots stop
+        // accumulating dead entries, and it never affects the exit code.
+        let current: HashSet<String> = diffs
+            .iter()
+            .map(|entry| signature(&entry.literal, entry.tables.as_ref(), entry.sheet.as_ref()))
+            .collect();
+        stale = entries
+            .iter()
+            .filter(|entry| !current.contains(&entry_signature(entry)))
+            .cloned()
+            .collect();
         let fresh: Vec<&CrossEntry> = diffs
             .iter()
             .copied()
@@ -411,7 +426,7 @@ fn cross(args: CrossArgs) -> ExitCode {
     }
 
     if args.scan.json {
-        print_json(&json!({
+        let mut output = json!({
             "disagreements": diffs.iter().map(|entry| json!({
                 "file": entry.file,
                 "line": entry.line,
@@ -419,7 +434,13 @@ fn cross(args: CrossArgs) -> ExitCode {
                 "tables": entry.tables.clone().unwrap_or_default(),
                 "sheet": entry.sheet.clone().unwrap_or_default(),
             })).collect::<Vec<_>>(),
-        }));
+        });
+        // Only under --ack: the plain --json output is the snapshot format,
+        // and the snapshot must stay nothing but disagreements.
+        if args.ack.is_some() {
+            output["staleAcks"] = serde_json::Value::Array(stale);
+        }
+        print_json(&output);
         return if args.ack.is_some() && !diffs.is_empty() {
             ExitCode::FAILURE
         } else {
@@ -446,7 +467,7 @@ fn cross(args: CrossArgs) -> ExitCode {
         }
     }
 
-    if args.ack.is_some() {
+    if let Some(ack_file) = &args.ack {
         if diffs.is_empty() {
             println!("overrule: no new disagreements, {acknowledged} acknowledged.");
         } else {
@@ -454,6 +475,14 @@ fn cross(args: CrossArgs) -> ExitCode {
                 "\n{} new {}, {acknowledged} acknowledged. Inspect each one, then refresh the snapshot with cross --json.",
                 diffs.len(),
                 plural(diffs.len(), "disagreement", "disagreements")
+            );
+        }
+        if !stale.is_empty() {
+            println!(
+                "{} of {ack_total} acknowledged {} matched nothing; prune them from {}.",
+                stale.len(),
+                plural(ack_total, "entry", "entries"),
+                ack_file.display()
             );
         }
         return if diffs.is_empty() {
