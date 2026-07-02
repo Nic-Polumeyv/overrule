@@ -1,6 +1,6 @@
 # overrule
 
-tailwind-merge as a dev tool, not a dependency. The CLI is Rust now.
+tailwind-merge as a dev tool, kept out of your production bundle. The CLI is Rust now.
 
 `check` reports class strings whose tokens fight and exits 1. `fix` rewrites each one to the form the merge would have produced, so it cannot change a pixel. `cross` compares the name tables against your compiled stylesheet and prints every disagreement. Same contract as the 0.3.x npm CLI, byte for byte where the engines agree: same text output, same JSON shapes, same exit codes, and ack snapshots interop both ways.
 
@@ -30,7 +30,7 @@ npx overrule cross src/ --ack acks.json       # CI gate: new disagreements only
 
 ## Runtime
 
-The npm package is the JavaScript runtime too, and bundlers tree-shake it out of production the way they do tailwind-merge. Wire the guard in dev and it vanishes in prod:
+The npm package is the JavaScript runtime too. The manifest declares `sideEffects: false` and the default oracle is built on first use, so importing `join` alone pulls no tailwind-merge into any bundle, Rollup or esbuild alike. Wire the guard in dev and it vanishes in prod:
 
 ```ts
 import { join, guard } from 'overrule';
@@ -80,7 +80,7 @@ Every test from the npm package maps here. `bun install` once so the cross test 
 | cli.test.ts, scanner and fix | src/scan.rs units + tests/scan.rs, fixed cross-checked against tw_merge |
 | css.test.ts, 22 cases | src/css.rs, all judging cases against pregenerated ASTs; the platform-neutrality test lives in src/lib.rs |
 | cli-bin.test.ts, binary end to end | tests/cli.rs, including the cross --ack gate against a real Tailwind compile |
-| join.test.ts, guard.test.ts, assert.test.ts | the npm package's suite, that half did not move |
+| join.test.ts, guard.test.ts, assert.test.ts | runtime/join.test.ts, guard.test.ts, merge-free.test.ts; props and declare-variants suites are newer |
 
 tests/fixtures/asts*.json are candidatesToAst dumps from the tailwindcss in node_modules; `node tests/fixtures/generate.mjs` regenerates them after a bump.
 

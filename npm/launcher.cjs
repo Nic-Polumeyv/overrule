@@ -31,4 +31,13 @@ try {
 }
 
 const result = spawnSync(bin, process.argv.slice(2), { stdio: 'inherit' });
+if (result.error) {
+	// Without this a corrupt or wrong-libc binary exits 1 with no output,
+	// indistinguishable from "conflicts found".
+	console.error(`overrule: could not run ${bin}: ${result.error.message}`);
+	process.exit(1);
+}
+if (result.signal) {
+	process.kill(process.pid, result.signal);
+}
 process.exit(result.status ?? 1);
