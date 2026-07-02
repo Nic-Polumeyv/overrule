@@ -12,21 +12,24 @@
 export type ClassValue = ClassValue[] | Record<string, unknown> | string | number | bigint | null | boolean | undefined;
 
 /**
- * Plain class join with clsx-compatible inputs: strings, numbers, nested
- * arrays, and { class: condition } dictionaries. No merging, no conflict
- * resolution. Pair it with guard() in dev to keep it honest.
+ * Plain class join, clsx-compatible. No merging, no conflict resolution:
+ * pair it with guard() in dev to keep it honest.
+ *
+ * @example
+ * ```ts
+ * join('flex', ['px-2', { 'font-bold': isBold }]); // 'flex px-2 font-bold'
+ * ```
  */
 export declare function join(...inputs: ClassValue[]): string;
 
 /**
- * A conflict oracle takes a class string and returns the tokens that lose.
- * An empty array means no token conflicts with another. The implementation
- * lives on overrule/map; the root entry stays free of it so importing join
- * pulls in no oracle at all.
+ * A conflict oracle takes a class string and returns the tokens that lose;
+ * an empty array means every token survives. Implementations come from
+ * overrule/map, never from here.
  */
 export type Oracle = (classes: string) => string[];
 
-/** What findConflicts reports when an oracle drops tokens. */
+/** One checked class string and the tokens an oracle would drop from it. */
 export type Conflict = {
 	/** The full class string that was checked. */
 	input: string;
@@ -35,23 +38,28 @@ export type Conflict = {
 };
 
 /**
- * Returns the tokens the oracle considers losers in a class string, or null
- * when nothing conflicts.
+ * Check one class string against an oracle.
+ *
+ * @returns The conflict with its losing tokens, or null when nothing conflicts.
  */
 export declare function findConflicts(classes: string, oracle: Oracle): Conflict | null;
 
 /**
- * Wraps a class join function and reports any class string whose tokens
- * conflict. The output passes through unchanged. Wire it up in dev only:
+ * Wrap a class join so every string it produces is checked. The output passes
+ * through unchanged.
  *
- *   import { join, guard } from 'overrule';
- *   import { createMapOracle } from 'overrule/map';
- *   import map from './conflicts.json';
- *   const cn = import.meta.env.DEV ? guard(join, createMapOracle(map)) : join;
+ * @param onConflict Reporter for each conflict. Defaults to console.warn,
+ * deduplicated per input and verdict pair.
+ * @example
+ * ```ts
+ * import { join, guard } from 'overrule';
+ * import { createMapOracle } from 'overrule/map';
+ * import map from './conflicts.json';
  *
- * The map comes from `overrule map`, so the verdicts come from your own
- * compiled stylesheet. The dev-only branch keeps all of it out of production.
- * The default reporter is console.warn, deduplicated per input/verdict pair.
+ * // conflicts.json comes from `overrule map`, so verdicts come from your own
+ * // compiled stylesheet. The DEV branch keeps all of it out of production.
+ * const cn = import.meta.env.DEV ? guard(join, createMapOracle(map)) : join;
+ * ```
  */
 export declare function guard<F extends (...args: never[]) => string>(
 	joinFn: F,
@@ -85,12 +93,31 @@ export type VariantFn<S extends VariantsSchema> = (
 ) => string;
 
 /**
- * Build a variants function from a config of class strings. No merging.
+ * Compile a variants config into a function. No merging: keep base and
+ * variants disjoint, and let assertVariantsMergeFree from overrule/test prove
+ * it. The config is compiled once; mutating it afterwards is unsupported.
  *
- * The config is compiled once. Mutating base, variants, or defaultVariants
- * after declareVariants(...) is called is unsupported.
+ * @throws On unknown config keys such as compoundVariants, instead of
+ * silently dropping styling.
+ * @example
+ * ```ts
+ * const button = declareVariants({
+ * 	base: 'inline-flex items-center',
+ * 	variants: { size: { sm: 'h-8 px-2', lg: 'h-11 px-4' } },
+ * 	defaultVariants: { size: 'sm' },
+ * });
+ * button();                              // 'inline-flex items-center h-8 px-2'
+ * button({ size: 'lg', class: 'mt-2' }); // 'inline-flex items-center h-11 px-4 mt-2'
+ * ```
  */
 export declare function declareVariants<S extends VariantsSchema>(config: VariantsConfig<S>): VariantFn<S>;
 
-/** Pull the axis props out of a variants function, without class. Use with typeof yourVariants. */
+/**
+ * The axis props of a variants function, without class.
+ *
+ * @example
+ * ```ts
+ * type ButtonProps = VariantProps<typeof button>; // { size?: 'sm' | 'lg' | null }
+ * ```
+ */
 export type VariantProps<T extends (props?: any) => string> = Omit<NonNullable<Parameters<T>[0]>, 'class'>;

@@ -1,6 +1,11 @@
 import type { Oracle } from './index.js';
 
 /**
+ * The overrule/map entry: the conflict oracle backed by your own compiled
+ * stylesheet, via the map `overrule map` emits. No name tables, no peers.
+ */
+
+/**
  * One compiled declaration group of a token. The bucket encodes the full
  * condition context (media queries, variants, pseudo pinning, importance)
  * as an opaque key; equality is its only operation, never parse it.
@@ -24,12 +29,20 @@ export type ConflictMap = {
 };
 
 /**
- * An oracle judged by a conflict map instead of tailwind-merge's name tables,
- * so the verdicts come from the stylesheet that actually ships. Replays the
- * dead-token rule: processing right to left, a token is dropped only when it
- * declares something and every (bucket, prop) it declares is already claimed
- * by a kept token. Unknown tokens are never dropped and claim nothing; the
- * map has no evidence about them. Dropped tokens claim nothing either: their
- * declarations lost, so they beat nobody.
+ * Build an oracle from a conflict map, so verdicts come from the stylesheet
+ * that actually ships. Replays the dead-token rule: processing right to left,
+ * a token is dropped only when every (bucket, prop) it declares is already
+ * claimed by a kept token. Unknown tokens are never dropped and claim
+ * nothing; dropped tokens beat nobody.
+ *
+ * @throws On a map version this runtime does not read.
+ * @example
+ * ```ts
+ * import { createMapOracle } from 'overrule/map';
+ * import map from './conflicts.json';
+ *
+ * const oracle = createMapOracle(map);
+ * oracle('p-2 p-4 p-2'); // ['p-4']: the last p-2 is what the cascade reads
+ * ```
  */
 export declare function createMapOracle(map: ConflictMap): Oracle;
