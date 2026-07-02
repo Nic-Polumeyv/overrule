@@ -278,3 +278,46 @@ fn ack_outside_cross_is_an_error() {
     assert_ne!(code, 0);
     assert!(err.contains("--ack"), "stderr: {err}");
 }
+
+#[test]
+fn judge_takes_arguments_and_exits_1_on_a_conflict() {
+    let (code, out, _) = run(&["judge", "p-2 p-4", "flex gap-2"], &root(), false);
+    assert_eq!(code, 1);
+    assert!(out.contains("drops  p-2"), "out: {out}");
+    assert!(out.contains("keeps  \"p-4\""), "out: {out}");
+
+    let (code, out, _) = run(&["judge", "flex gap-2"], &root(), false);
+    assert_eq!(code, 0);
+    assert!(out.contains("no class conflicts found"), "out: {out}");
+}
+
+#[test]
+fn judge_reads_stdin_and_returns_verdicts_in_input_order() {
+    use std::io::Write;
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_overrule"))
+        .args(["judge", "--json"])
+        .current_dir(root())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .env("GITHUB_ACTIONS", "false")
+        .spawn()
+        .expect("the binary runs");
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(b"text-sm text-lg\n\nm-1 m-2\nclean ok\n")
+        .expect("stdin accepts input");
+    let output = child.wait_with_output().expect("the binary exits");
+    assert_eq!(output.status.code(), Some(1));
+
+    let data: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).expect("valid json");
+    let verdicts = data["verdicts"].as_array().expect("verdicts array");
+    // The blank line is skipped; verdicts follow input order, clean ones included.
+    assert_eq!(verdicts.len(), 3);
+    assert_eq!(verdicts[0]["literal"], serde_json::json!("text-sm text-lg"));
+    assert_eq!(verdicts[0]["dropped"], serde_json::json!(["text-sm"]));
+    assert_eq!(verdicts[1]["fixed"], serde_json::json!("m-2"));
+    assert_eq!(verdicts[2]["dropped"], serde_json::json!([]));
+}
