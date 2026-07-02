@@ -10,7 +10,7 @@ import { join, type ClassValue } from './index.js';
  *
  * `createMergeProps(options)` builds a merger. With no options it is platform-
  * neutral: a merged `style` stays a JS style object, no attribute is dropped,
- * and same-named functions are chained. Opt into framework idioms by passing options — serialize
+ * and same-named functions are chained. Opt into framework idioms by passing options: serialize
  * style to a string (`styleAs: 'string'`), drop boolean attrs set to false
  * (`dropFalseAttrs`), compose DOM handlers (`isEventHandler`). Framework-specific
  * policy is the consumer's to assemble; overrule ships only the engine.
