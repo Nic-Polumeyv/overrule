@@ -83,6 +83,9 @@ writeFileSync(
 			repository: REPO,
 			license: 'MIT',
 			type: 'module',
+			// join-only consumers must be able to shake the guard's tailwind-merge
+			// import out; the runtime has no module-scope side effects.
+			sideEffects: false,
 			bin: { overrule: 'bin/overrule.cjs' },
 			engines: { node: '>=18' },
 			exports: {

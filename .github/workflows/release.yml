@@ -39,8 +39,20 @@ jobs:
             target/${{ matrix.target }}/release/overrule
             target/${{ matrix.target }}/release/overrule.exe
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: cargo test
+      - run: bun test
+      - run: bunx tsc -p tsconfig.test.json
+
   release:
-    needs: build
+    needs: [build, test]
     runs-on: ubuntu-latest
     permissions:
       id-token: write # OIDC trusted publishing — no NPM_TOKEN, no OTP
