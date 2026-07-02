@@ -250,3 +250,12 @@ test('a variants-less config still appends the caller class', () => {
 	expect(declareVariants({})({ class: 'mt-2' })).toBe('mt-2');
 	expect(declareVariants({ base: 'card' })()).toBe('card');
 });
+
+test('the trailing class takes anything join takes', () => {
+	expect(button({ size: 'lg', class: ['mt-2', { hidden: false, block: true }] })).toBe(
+		'inline-flex items-center h-11 px-4 text-base bg-black text-white mt-2 block',
+	);
+	expect(button({ class: null })).toBe('inline-flex items-center h-8 px-2 text-sm bg-black text-white');
+	expect(declareVariants({ base: 'card' })({ class: ['a', 0, 'b'] })).toBe('card a b');
+	expect(declareVariants({})({ class: [null, undefined] })).toBe('');
+});

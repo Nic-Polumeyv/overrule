@@ -86,10 +86,11 @@ export type VariantsConfig<S extends VariantsSchema> = {
 /**
  * What declareVariants returns: axis selections in, class string out. An
  * undefined selection defers to the axis default, an explicit null clears
- * the axis. A trailing class is appended, never merged.
+ * the axis. A trailing class is appended, never merged; it takes anything
+ * join takes, so callers pass their class prop straight through.
  */
 export type VariantFn<S extends VariantsSchema> = (
-	props?: { [K in keyof S]?: AxisValue<keyof S[K]> | null | undefined } & { class?: string },
+	props?: { [K in keyof S]?: AxisValue<keyof S[K]> | null | undefined } & { class?: ClassValue },
 ) => string;
 
 /**
@@ -110,7 +111,9 @@ export type VariantFn<S extends VariantsSchema> = (
  * button({ size: 'lg', class: 'mt-2' }); // 'inline-flex items-center h-11 px-4 mt-2'
  * ```
  */
-export declare function declareVariants<S extends VariantsSchema>(config: VariantsConfig<S>): VariantFn<S>;
+export declare function declareVariants<S extends VariantsSchema = Record<never, never>>(
+	config: VariantsConfig<S>,
+): VariantFn<S>;
 
 /**
  * The axis props of a variants function, without class.

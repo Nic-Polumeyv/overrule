@@ -97,6 +97,17 @@ export function guard(joinFn, oracle, onConflict = warnOnce) {
 	return /** @type {F} */ (guarded);
 }
 
+// The trailing class takes anything join takes; plain strings, the common
+// case, skip the join call.
+/**
+ * @param {import('./index.js').ClassValue} c
+ * @returns {string}
+ */
+function trailing(c) {
+	if (c == null) return '';
+	return typeof c === 'string' ? c : join(c);
+}
+
 // Own-property lookup: a selection like 'toString' must select nothing, not
 // walk the prototype chain and inject function source into the class string.
 /**
@@ -114,7 +125,7 @@ function pick(m, s) {
  *
  * The config is compiled once. Mutating base, variants, or defaultVariants
  * after declareVariants(...) is called is unsupported.
- * @template {import('./index.js').VariantsSchema} S
+ * @template {import('./index.js').VariantsSchema} [S=Record<never, never>]
  * @param {import('./index.js').VariantsConfig<S>} config
  * @returns {import('./index.js').VariantFn<S>}
  */
@@ -133,8 +144,11 @@ export function declareVariants(config) {
 	if (v == null) {
 		return /** @type {import('./index.js').VariantFn<S>} */ (
 			b
-				? (/** @type {{ class?: string } | undefined} */ p) => (p?.class ? b + ' ' + p.class : b)
-				: (/** @type {{ class?: string } | undefined} */ p) => p?.class ?? ''
+				? (/** @type {{ class?: import('./index.js').ClassValue } | undefined} */ p) => {
+						const c = trailing(p?.class);
+						return c ? b + ' ' + c : b;
+					}
+				: (/** @type {{ class?: import('./index.js').ClassValue } | undefined} */ p) => trailing(p?.class)
 		);
 	}
 
@@ -176,7 +190,7 @@ export function declareVariants(config) {
 				}
 			}
 
-			const c = p.class;
+			const c = trailing(p.class);
 			return c ? (o ? o + ' ' + c : c) : o;
 		}
 	);
