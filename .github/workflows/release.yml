@@ -86,9 +86,21 @@ jobs:
       # Publish on the workflow's OIDC identity (npm trusted publishing). Platform
       # packages first, wrapper last so it never references a version that isn't up
       # yet. No token, no OTP; npm attaches provenance automatically.
+      # Skip versions that already exist so a failed run can be re-driven:
+      # a partial publish once stranded 0.4.3, and 0.4.9 died the same way
+      # when one platform package lacked its trusted publisher.
       - run: |
-          for p in dist-npm/overrule-*; do (cd "$p" && npm publish --provenance --access public); done
-          (cd dist-npm/overrule && npm publish --provenance --access public)
+          publish() {
+            name=$(node -p "require('./$1/package.json').name")
+            version=$(node -p "require('./$1/package.json').version")
+            if curl -sf -o /dev/null "https://registry.npmjs.org/$name/$version"; then
+              echo "$name@$version already published, skipping"
+            else
+              (cd "$1" && npm publish --provenance --access public)
+            fi
+          }
+          for p in dist-npm/overrule-*; do publish "$p"; done
+          publish dist-npm/overrule
       - run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
