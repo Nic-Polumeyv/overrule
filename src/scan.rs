@@ -102,7 +102,7 @@ struct Literal<'a> {
 /// The literal with losing tokens removed and exact duplicates collapsed into
 /// their last occurrence. Same survivors tailwind-fuse keeps, so the rewrite
 /// cannot change a pixel; the test suite cross-checks this against tw_merge.
-fn without_losers(literal: &str, dropped: &[String]) -> String {
+pub fn without_losers(literal: &str, dropped: &[String]) -> String {
     let losers: FxHashSet<&str> = dropped.iter().map(String::as_str).collect();
     let tokens: Vec<&str> = literal.split_whitespace().collect();
     let mut last_index: FxHashMap<&str, usize> = FxHashMap::default();

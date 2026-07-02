@@ -15,7 +15,9 @@ use serde_json::json;
 use overrule::bridge::compile_candidates;
 use overrule::css::{CompiledCandidates, CssOracle, TypoOracle};
 use overrule::oracle::{Memo, Oracle, TwFuseOracle};
-use overrule::scan::{Finding, SourceFile, apply_fixes, read_paths, scan_files, scan_paths};
+use overrule::scan::{
+    Finding, SourceFile, apply_fixes, read_paths, scan_files, scan_paths, without_losers,
+};
 
 // The scanner's hot loop allocates a String per kept token per literal;
 // mimalloc's thread-local heaps make that markedly cheaper under rayon.
@@ -41,6 +43,8 @@ enum Command {
     Fix(ScanArgs),
     /// report every string where tailwind-fuse and your stylesheet disagree
     Cross(CrossArgs),
+    /// judge class strings given as arguments or on stdin, one per line
+    Judge(JudgeArgs),
 }
 
 #[derive(Args)]
@@ -70,6 +74,18 @@ struct CrossArgs {
     ack: Option<PathBuf>,
 }
 
+#[derive(Args)]
+struct JudgeArgs {
+    /// class strings to judge; with none given, one per line is read from stdin
+    literals: Vec<String>,
+    /// judge with your compiled stylesheet instead of tailwind-fuse's tables
+    #[arg(long, value_name = "file")]
+    css: Option<PathBuf>,
+    /// machine output: one verdict per literal, in input order
+    #[arg(long)]
+    json: bool,
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
@@ -81,6 +97,7 @@ fn main() -> ExitCode {
         Command::Check(args) => check_or_fix(args, false),
         Command::Fix(args) => check_or_fix(args, true),
         Command::Cross(args) => cross(args),
+        Command::Judge(args) => judge(args),
     }
 }
 
@@ -160,6 +177,97 @@ fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
 
 fn display(finding: &Finding) -> String {
     finding.file.display().to_string()
+}
+
+/// Judge bare class strings with no scanner in between: the seam that lets a
+/// test suite ask the same engine check uses. A string that is not in a file
+/// has no line to point at, so verdicts come back in input order.
+fn judge(args: JudgeArgs) -> ExitCode {
+    let literals: Vec<String> = if args.literals.is_empty() {
+        match std::io::read_to_string(std::io::stdin()) {
+            Ok(input) => input
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .map(str::to_string)
+                .collect(),
+            Err(e) => {
+                eprintln!("judge: reading stdin failed: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    } else {
+        args.literals
+    };
+
+    let verdicts: Vec<(String, Vec<String>)> = match &args.css {
+        Some(entry) => {
+            let mut tokens: Vec<String> = literals
+                .iter()
+                .flat_map(|l| l.split_whitespace())
+                .map(str::to_string)
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            tokens.sort_unstable();
+            let oracle = match compile_candidates(&tokens, Some(entry.as_path())) {
+                Ok(asts) => CssOracle::new(CompiledCandidates::from_asts(asts)),
+                Err(message) => {
+                    eprintln!("{message}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            literals
+                .into_iter()
+                .map(|l| {
+                    let dropped = oracle.losers(&l);
+                    (l, dropped)
+                })
+                .collect()
+        }
+        None => {
+            let oracle = Memo::new(TwFuseOracle);
+            literals
+                .into_iter()
+                .map(|l| {
+                    let dropped = oracle.losers(&l);
+                    (l, dropped)
+                })
+                .collect()
+        }
+    };
+
+    let conflicts = verdicts.iter().filter(|(_, d)| !d.is_empty()).count();
+
+    if args.json {
+        print_json(&json!({
+            "verdicts": verdicts.iter().map(|(literal, dropped)| json!({
+                "literal": literal,
+                "dropped": dropped,
+                "fixed": without_losers(literal, dropped),
+            })).collect::<Vec<_>>(),
+        }));
+    } else if conflicts == 0 {
+        println!("overrule: no class conflicts found.");
+    } else {
+        for (literal, dropped) in &verdicts {
+            if dropped.is_empty() {
+                continue;
+            }
+            println!("  drops  {}", dropped.join(" "));
+            println!("  in     \"{literal}\"");
+            println!("  keeps  \"{}\"", without_losers(literal, dropped));
+        }
+        println!(
+            "\n{conflicts} conflicting class {}.",
+            plural(conflicts, "string", "strings")
+        );
+    }
+
+    if conflicts == 0 {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
