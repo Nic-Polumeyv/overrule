@@ -14,6 +14,8 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
           - target: x86_64-apple-darwin
@@ -22,6 +24,10 @@ jobs:
             runner: macos-latest
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
+          # windows-11-arm is public-repo only; fine here, and a native build
+          # keeps mimalloc's C away from the MSVC cross toolchain.
+          - target: aarch64-pc-windows-msvc
+            runner: windows-11-arm
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +37,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+      # musl-gcc, which cc needs to compile mimalloc for the musl target.
+      - run: sudo apt-get install -y musl-tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
       - run: cargo build --release --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:

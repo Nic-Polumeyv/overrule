@@ -4,15 +4,30 @@
 // it and hands over. CommonJS on purpose: it runs everywhere node does.
 const { spawnSync } = require('node:child_process');
 
+// Names must match TARGETS in scripts/assemble-npm.mjs; the two lists have
+// drifted before.
 const PACKAGES = {
 	'linux-x64': 'overrule-linux-x64',
+	'linux-x64-musl': 'overrule-linux-x64-musl',
 	'linux-arm64': 'overrule-linux-arm64',
 	'darwin-x64': 'overrule-darwin-x64',
 	'darwin-arm64': 'overrule-darwin-arm64',
 	'win32-x64': 'overrule-windows-x64',
+	'win32-arm64': 'overrule-windows-arm64',
 };
 
-const key = `${process.platform}-${process.arch}`;
+// glibc names itself in the process report; musl stays silent. A report that
+// cannot be read counts as glibc, the common case. linux-arm64 has no musl
+// build yet, so that key misses the map and gets the build-from-source error.
+function isMusl() {
+	try {
+		return !process.report.getReport().header.glibcVersionRuntime;
+	} catch {
+		return false;
+	}
+}
+
+const key = `${process.platform}-${process.arch}${process.platform === 'linux' && isMusl() ? '-musl' : ''}`;
 const pkg = PACKAGES[key];
 if (!pkg) {
 	console.error(`overrule: no prebuilt binary for ${key}. Build from source: cargo build --release in the repo.`);

@@ -14,7 +14,7 @@ bun add -d overrule
 npm i -D overrule
 ```
 
-The package is a native binary behind a 30-line shim: npm picks the right prebuilt from optionalDependencies (linux x64/arm64, macOS x64/arm64, windows x64) and `npx overrule` hands over to it. Any other platform builds from source with `cargo build --release`.
+The package is a native binary behind a 30-line shim: npm picks the right prebuilt from optionalDependencies (linux x64/arm64 plus x64 musl, macOS x64/arm64, windows x64/arm64) and `npx overrule` hands over to it. Any other platform builds from source with `cargo build --release`.
 
 ## Run
 
