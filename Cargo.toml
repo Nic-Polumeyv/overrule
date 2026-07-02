@@ -1,6 +1,6 @@
 [package]
 name = "overrule"
-version = "0.4.11"
+version = "0.5.0"
 edition = "2024"
 description = "catch Tailwind class conflicts before they ship. The Rust port of overrule's CLI."
 repository = "https://github.com/Nic-Polumeyv/overrule"
