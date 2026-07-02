@@ -15,7 +15,7 @@
 //! Tailwind itself and Tailwind lives in JavaScript. Reimplementing it here
 //! would recreate the drift this tool exists to catch.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::LazyLock;
 
 use serde::Deserialize;
@@ -407,6 +407,66 @@ impl CompiledCandidates {
             .collect();
         Self { decls }
     }
+
+    /// The conflict map, version 1: a fixed contract with overrule's JS map
+    /// oracle, which replays [`CssOracle`]'s dead-token rule from this data
+    /// with no compiler at hand. `tokens` holds every token that compiled to
+    /// at least one declaration, one group per distinct bucket; the bucket
+    /// string is the judge's own (conditions plus importance, sorted the way
+    /// `bucket_of` sorts them) and stays opaque to consumers. `covers` is the
+    /// inverse of the coverage table, keyed by the winning property. Every
+    /// key, group, and list is sorted, so the same project emits
+    /// byte-identical maps. Bump `version` on any shape change.
+    pub fn conflict_map(&self) -> serde_json::Value {
+        let mut winners: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+        for (loser, parents) in COVERED_BY.iter() {
+            for winner in parents {
+                winners.entry(winner).or_default().insert(loser);
+            }
+        }
+        let mut covers = serde_json::Map::new();
+        for (winner, losers) in winners {
+            covers.insert(
+                winner.to_string(),
+                serde_json::Value::from_iter(losers.into_iter().map(str::to_string)),
+            );
+        }
+
+        let mut names: Vec<&String> = self.decls.keys().collect();
+        names.sort_unstable();
+        let mut tokens = serde_json::Map::new();
+        for name in names {
+            let Some(decls) = self.decls[name].as_ref() else {
+                continue;
+            };
+            if decls.is_empty() {
+                continue;
+            }
+            let mut groups: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+            for decl in decls {
+                groups
+                    .entry(&decl.bucket)
+                    .or_default()
+                    .insert(&decl.property);
+            }
+            let entry: Vec<serde_json::Value> = groups
+                .into_iter()
+                .map(|(bucket, props)| {
+                    serde_json::json!({
+                        "bucket": bucket,
+                        "props": props.into_iter().collect::<Vec<_>>(),
+                    })
+                })
+                .collect();
+            tokens.insert(name.clone(), serde_json::Value::Array(entry));
+        }
+
+        serde_json::json!({
+            "version": 1,
+            "covers": covers,
+            "tokens": tokens,
+        })
+    }
 }
 
 /// The stylesheet-derived oracle. Tokens the compiler does not recognize, or
@@ -737,5 +797,192 @@ mod tests {
         let t = typos();
         assert_eq!(t.losers("p-4 text-xsm btn"), ["text-xsm", "btn"]);
         assert!(t.losers("flex h-9 border-grid").is_empty());
+    }
+
+    /// The dead-token rule replayed over the map alone, the algorithm the JS
+    /// map oracle implements. A token dies only when every property in every
+    /// group is beaten by a later mapped token declaring the same or a
+    /// covering property under an identical bucket string. Drift between the
+    /// map and CssOracle must fail here before it ships.
+    fn map_losers(map: &serde_json::Value, classes: &str) -> Vec<String> {
+        let covers = map["covers"].as_object().expect("covers object");
+        let mapped = map["tokens"].as_object().expect("tokens object");
+        let beats = |winner: &str, loser: &str| {
+            winner == loser
+                || covers
+                    .get(winner)
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|losers| losers.iter().any(|l| l.as_str() == Some(loser)))
+        };
+        let raw: Vec<&str> = classes.split_whitespace().collect();
+        let mut seen = HashSet::new();
+        let tokens: Vec<&str> = raw.iter().copied().filter(|t| seen.insert(*t)).collect();
+        let position: HashMap<&str, usize> = tokens
+            .iter()
+            .map(|token| (*token, raw.iter().rposition(|t| t == token).unwrap()))
+            .collect();
+        let groups_of = |token: &str| mapped.get(token).and_then(serde_json::Value::as_array);
+        let known: Vec<&str> = tokens
+            .iter()
+            .copied()
+            .filter(|t| groups_of(t).is_some())
+            .collect();
+        known
+            .iter()
+            .filter(|token| {
+                groups_of(token).unwrap().iter().all(|group| {
+                    let bucket = group["bucket"].as_str().expect("bucket string");
+                    group["props"]
+                        .as_array()
+                        .expect("props array")
+                        .iter()
+                        .all(|prop| {
+                            let prop = prop.as_str().expect("property string");
+                            known.iter().any(|other| {
+                                position[other] > position[*token]
+                                    && groups_of(other).unwrap().iter().any(|own| {
+                                        own["bucket"].as_str() == Some(bucket)
+                                            && own["props"].as_array().unwrap().iter().any(|w| {
+                                                beats(w.as_str().expect("property string"), prop)
+                                            })
+                                    })
+                            })
+                        })
+                })
+            })
+            .map(|token| token.to_string())
+            .collect()
+    }
+
+    /// Every judgment shape the suite above exercises: same-bucket conflicts,
+    /// cross-bucket composition, shorthand coverage, custom-property exports,
+    /// importance, variant buckets, duplicates, unknown tokens.
+    const CORPUS: &[&str] = &[
+        "h-9 px-4 h-8",
+        "px-4 px-2 text-sm",
+        "bg-red-500 p-2 bg-blue-500",
+        "h-8 px-4 h-8",
+        "flex h-9 items-center rounded-md",
+        "font-medium font-normal!",
+        "font-medium! font-normal!",
+        "p-2 md:p-4",
+        "md:p-2 md:p-4",
+        "hover:md:p-2 md:hover:p-4",
+        "before:hover:m-1 hover:before:m-2",
+        "before:focus:underline before:focus:no-underline",
+        "before:focus:underline focus:before:no-underline",
+        "px-2 p-4",
+        "p-4 px-2",
+        "scroll-mt-2 scroll-m-4",
+        "scroll-m-4 scroll-mt-2",
+        "border-grid border-red-500",
+        "border-red-500 border-grid",
+        "leading-snug text-xs",
+        "text-xs leading-snug",
+        "leading-tight leading-snug",
+        "ordinal slashed-zero",
+        "focus-visible:ring-red-500/50 bg-red-500",
+        "font-medium [font-weight:900]",
+        "translate-x-2 translate-none",
+        "ordinal normal-nums",
+        "ring-2 shadow-lg",
+        "ring-red-500/50 focus-visible:ring-[3px]",
+        "aria-invalid:ring-red-500/20 focus-visible:ring-[3px]",
+        "text-sm text-lg/7",
+        "text-lg/7 leading-snug",
+        "leading-snug text-lg/7",
+        "flex line-clamp-2",
+        "line-clamp-2 flex",
+        "[&>svg]:size-4 [&>svg]:size-5",
+        "[&>svg]:hover:size-4 hover:[&>svg]:size-5",
+        "[padding:1rem] p-4",
+        "[--cell-size:3rem] p-4",
+        "border-bs-2 border",
+        "border border-bs-2",
+        "pbs-2 p-4",
+        "p-4 pbs-2",
+        "text-xsm p-4 p-2",
+        "not-a-class also-not-one",
+    ];
+
+    #[test]
+    fn map_replay_matches_the_css_oracle_across_the_corpus() {
+        let compiled = compiled(include_str!("../tests/fixtures/asts.json"));
+        let map = compiled.conflict_map();
+        let o = CssOracle::new(compiled);
+        for classes in CORPUS {
+            assert_eq!(map_losers(&map, classes), o.losers(classes), "{classes}");
+        }
+    }
+
+    #[test]
+    fn map_replay_matches_on_a_prefixed_project_too() {
+        let compiled = compiled(include_str!("../tests/fixtures/asts-prefixed.json"));
+        let map = compiled.conflict_map();
+        let o = CssOracle::new(compiled);
+        for classes in ["tw:p-2 tw:p-4", "p-2 p-4", "tw:p-4 tw:p-2 tw:p-4"] {
+            assert_eq!(map_losers(&map, classes), o.losers(classes), "{classes}");
+        }
+    }
+
+    #[test]
+    fn map_replay_matches_on_digit_leading_escaped_selectors() {
+        // The 2xl case: the own-selector unescape must already be baked into
+        // the bucket strings, or the pair lands in different buckets and the
+        // replay diverges.
+        let compiled = compiled(
+            r#"{
+	"2xl:p-2": [{"kind": "rule", "selector": ".\\32 xl\\:p-2", "nodes": [
+		{"kind": "at-rule", "name": "@media", "params": "(width >= 96rem)", "nodes": [
+			{"kind": "declaration", "property": "padding", "important": false}
+		]}
+	]}],
+	"2xl:p-4": [{"kind": "rule", "selector": ".\\32 xl\\:p-4", "nodes": [
+		{"kind": "at-rule", "name": "@media", "params": "(width >= 96rem)", "nodes": [
+			{"kind": "declaration", "property": "padding", "important": false}
+		]}
+	]}]
+}"#,
+        );
+        let map = compiled.conflict_map();
+        let o = CssOracle::new(compiled);
+        for classes in ["2xl:p-2 2xl:p-4", "2xl:p-4 2xl:p-2"] {
+            assert_eq!(map_losers(&map, classes), o.losers(classes), "{classes}");
+        }
+        assert_eq!(map_losers(&map, "2xl:p-2 2xl:p-4"), ["2xl:p-2"]);
+    }
+
+    #[test]
+    fn the_conflict_map_shape_is_version_1_with_sorted_entries() {
+        let map = compiled(include_str!("../tests/fixtures/asts.json")).conflict_map();
+        assert_eq!(map["version"], serde_json::json!(1));
+
+        // One bare bucket, one property, verbatim from the compiled decls.
+        assert_eq!(
+            map["tokens"]["px-4"],
+            serde_json::json!([{"bucket": "", "props": ["padding-inline"]}])
+        );
+        // Importance is part of the bucket string.
+        assert_eq!(
+            map["tokens"]["font-normal!"][0]["bucket"].as_str().unwrap(),
+            " !"
+        );
+        // Variants carry their condition stretch into the bucket.
+        assert_eq!(
+            map["tokens"]["md:p-4"],
+            serde_json::json!([{"bucket": "@media (width >= 48rem)", "props": ["padding"]}])
+        );
+        // Custom properties are declarations, emitted verbatim and sorted.
+        assert_eq!(
+            map["tokens"]["ring-2"],
+            serde_json::json!([{"bucket": "", "props": ["--tw-ring-shadow", "box-shadow"]}])
+        );
+        // Tokens that compile to nothing stay out; TypoOracle owns those.
+        assert!(map["tokens"].get("text-xsm").is_none());
+        // covers reads winner-first: a kept shorthand defeats its longhands.
+        let padding = map["covers"]["padding"].as_array().unwrap();
+        assert!(padding.iter().any(|p| p == "padding-inline"));
+        assert!(padding.iter().any(|p| p == "padding-top"));
+        assert!(!map["covers"].as_object().unwrap().contains_key("height"));
     }
 }
