@@ -72,6 +72,42 @@ fn fix_rewrites_to_merged_form_and_a_second_scan_is_clean() {
 }
 
 #[test]
+fn nested_calls_report_the_shared_literal_once() {
+    // The outer and the inner call both collect the same string at the same
+    // offset; the start dedupe keeps the finding single.
+    let findings = scan_source("cn(cn('h-9 px-4 h-8'))", &TwFuseOracle);
+    assert_eq!(findings.len(), 1, "findings: {findings:?}");
+    assert_eq!(findings[0].dropped, ["h-9"]);
+}
+
+#[test]
+fn overlapping_findings_rewrite_once_and_the_result_is_stable() {
+    // A call string carrying a class='...' substring is found twice: the
+    // attribute regex takes the inner span, the call collector the whole
+    // string. Splicing both would rewrite the outer against stale offsets.
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("nested.svelte");
+    fs::write(
+        &file,
+        "<script>\n\tconst c = cn(\"class=' p-2 p-4 ' m-1\");\n</script>\n\n<div class=\"h-9 px-4 h-8\">x</div>\n",
+    )
+    .unwrap();
+    let paths = vec![dir.path().to_path_buf()];
+    let findings = scan_paths(&paths, &TwFuseOracle);
+    assert_eq!(findings.len(), 3, "findings: {findings:?}");
+    apply_fixes(&findings).unwrap();
+    let fixed = fs::read_to_string(&file).unwrap();
+    assert_eq!(
+        fixed,
+        "<script>\n\tconst c = cn(\"class='p-4' m-1\");\n</script>\n\n<div class=\"px-4 h-8\">x</div>\n"
+    );
+    let rescan = scan_paths(&paths, &TwFuseOracle);
+    assert!(rescan.is_empty(), "rescan: {rescan:?}");
+    apply_fixes(&rescan).unwrap();
+    assert_eq!(fs::read_to_string(&file).unwrap(), fixed);
+}
+
+#[test]
 fn declare_variants_config_objects_are_scanned_self_conflicts_reported() {
     // Inline, not a fixture file: tests/fixtures is scanned wholesale by the cli
     // tests, which assert an exact finding count, so a fixture here would break them.

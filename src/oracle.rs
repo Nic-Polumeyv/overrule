@@ -242,6 +242,17 @@ mod tests {
     }
 
     #[test]
+    fn trailing_important_rewrites_keep_variants_in_front() {
+        // The rewrite must carry variants through: dropping them would put
+        // hover:p-2! in the bare important padding bucket, where it wrongly
+        // contests !p-2 or, unimportant, p-4.
+        let oracle = TwFuseOracle;
+        assert_eq!(oracle.losers("hover:p-2! p-4"), Vec::<String>::new());
+        assert_eq!(oracle.losers("!p-2 hover:p-4!"), Vec::<String>::new());
+        assert_eq!(oracle.losers("hover:p-2! hover:p-4!"), ["hover:p-2!"]);
+    }
+
+    #[test]
     fn memo_judges_each_distinct_literal_once() {
         let calls = std::cell::Cell::new(0);
         let counting = |classes: &str| {

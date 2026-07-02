@@ -266,8 +266,17 @@ pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
     for (file, mut conflicts) in by_file {
         let mut src = fs::read_to_string(file)?;
         conflicts.sort_by_key(|conflict| std::cmp::Reverse(conflict.start));
+        // Ranges can nest: a call string carrying a class='...' substring is
+        // reported by both regexes. Rewriting the outer after the inner would
+        // splice against stale offsets, so overlaps are skipped and the next
+        // fix run picks up whatever the survivor left behind.
+        let mut last_start = usize::MAX;
         for conflict in conflicts {
+            if conflict.end > last_start {
+                continue;
+            }
             src.replace_range(conflict.start..conflict.end, &conflict.fixed);
+            last_start = conflict.start;
         }
         fs::write(file, src)?;
     }
@@ -334,11 +343,15 @@ mod tests {
 
     #[test]
     fn comments_between_call_args_do_not_open_phantom_strings() {
-        let src = "join(\n  // we don't want ticks\n  'a loser b',\n  /* nor \"rules\" */\n  'c d',\n)";
+        // Each comment carries an unbalanced quote, so skipping either one
+        // is what keeps the literal after it from being swallowed.
+        let src =
+            "join(\n  // we don't want ticks\n  'a loser b',\n  /* don't */\n  'c loser d',\n)";
         let findings = scan_source(src, &fake);
-        assert_eq!(findings.len(), 1);
+        assert_eq!(findings.len(), 2, "findings: {findings:?}");
         assert_eq!(findings[0].dropped, ["loser"]);
         assert_eq!(findings[0].fixed, "a b");
+        assert_eq!(findings[1].fixed, "c d");
     }
 
     #[test]
