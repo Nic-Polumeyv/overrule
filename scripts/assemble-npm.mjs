@@ -1,6 +1,6 @@
 // Assembles the publishable npm packages from prebuilt binaries: one tiny
 // package per platform plus the overrule wrapper whose bin is the launcher.
-// The release workflow runs this with all five targets; pass --partial to
+// The release workflow runs this with all seven targets; pass --partial to
 // assemble whatever subset exists locally for testing.
 //
 //   node scripts/assemble-npm.mjs <version> <binaries-dir> <out-dir> [--partial]
@@ -11,12 +11,20 @@ import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Package names must match PACKAGES in npm/launcher.cjs; the two lists have
+// drifted before. Both linux x64 packages declare the same os and cpu, so
+// the libc field is what stops installers that understand it (npm >= 10.4,
+// pnpm, yarn) from fetching the wrong one; older installers fetch both and
+// the launcher picks at runtime. Windows is never win32 in a name: npm's
+// spam filter blocks unscoped *-win32-* packages.
 const TARGETS = {
-	'x86_64-unknown-linux-gnu': { name: 'overrule-linux-x64', os: 'linux', cpu: 'x64', bin: 'overrule' },
-	'aarch64-unknown-linux-gnu': { name: 'overrule-linux-arm64', os: 'linux', cpu: 'arm64', bin: 'overrule' },
+	'x86_64-unknown-linux-gnu': { name: 'overrule-linux-x64', os: 'linux', cpu: 'x64', libc: 'glibc', bin: 'overrule' },
+	'x86_64-unknown-linux-musl': { name: 'overrule-linux-x64-musl', os: 'linux', cpu: 'x64', libc: 'musl', bin: 'overrule' },
+	'aarch64-unknown-linux-gnu': { name: 'overrule-linux-arm64', os: 'linux', cpu: 'arm64', libc: 'glibc', bin: 'overrule' },
 	'x86_64-apple-darwin': { name: 'overrule-darwin-x64', os: 'darwin', cpu: 'x64', bin: 'overrule' },
 	'aarch64-apple-darwin': { name: 'overrule-darwin-arm64', os: 'darwin', cpu: 'arm64', bin: 'overrule' },
 	'x86_64-pc-windows-msvc': { name: 'overrule-windows-x64', os: 'win32', cpu: 'x64', bin: 'overrule.exe' },
+	'aarch64-pc-windows-msvc': { name: 'overrule-windows-arm64', os: 'win32', cpu: 'arm64', bin: 'overrule.exe' },
 };
 
 const REPO = { type: 'git', url: 'git+https://github.com/Nic-Polumeyv/overrule.git' };
@@ -54,6 +62,7 @@ for (const [target, platform] of Object.entries(TARGETS)) {
 				license: 'MIT',
 				os: [platform.os],
 				cpu: [platform.cpu],
+				...(platform.libc ? { libc: [platform.libc] } : {}),
 				files: [platform.bin],
 			},
 			null,
