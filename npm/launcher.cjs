@@ -4,21 +4,8 @@
 // it and hands over. CommonJS on purpose: it runs everywhere node does.
 const { spawnSync } = require('node:child_process');
 
-// Names must match TARGETS in scripts/assemble-npm.mjs; the two lists have
-// drifted before.
-const PACKAGES = {
-	'linux-x64': 'overrule-linux-x64',
-	'linux-x64-musl': 'overrule-linux-x64-musl',
-	'linux-arm64': 'overrule-linux-arm64',
-	'darwin-x64': 'overrule-darwin-x64',
-	'darwin-arm64': 'overrule-darwin-arm64',
-	'win32-x64': 'overrule-windows-x64',
-	'win32-arm64': 'overrule-windows-arm64',
-};
-
 // glibc names itself in the process report; musl stays silent. A report that
-// cannot be read counts as glibc, the common case. linux-arm64 has no musl
-// build yet, so that key misses the map and gets the build-from-source error.
+// cannot be read counts as glibc, the common case.
 function isMusl() {
 	try {
 		return !process.report.getReport().header.glibcVersionRuntime;
@@ -27,10 +14,20 @@ function isMusl() {
 	}
 }
 
-const key = `${process.platform}-${process.arch}${process.platform === 'linux' && isMusl() ? '-musl' : ''}`;
-const pkg = PACKAGES[key];
-if (!pkg) {
-	console.error(`overrule: no prebuilt binary for ${key}. Build from source: cargo build --release in the repo.`);
+// Package names follow one rule: overrule-<os>-<arch>, win32 spelled windows
+// (npm's spam filter blocks unscoped *-win32-* names), -musl appended on
+// musl. Which of those names exist is not knowledge this file keeps: the
+// wrapper's optionalDependencies, generated from TARGETS in
+// scripts/assemble-npm.mjs, is the one list.
+const os = process.platform === 'win32' ? 'windows' : process.platform;
+const musl = process.platform === 'linux' && isMusl() ? '-musl' : '';
+const pkg = `overrule-${os}-${process.arch}${musl}`;
+
+if (!Object.hasOwn(require('../package.json').optionalDependencies ?? {}, pkg)) {
+	console.error(
+		`overrule: no prebuilt binary for ${process.platform}-${process.arch}${musl}. ` +
+			'Build from source: cargo build --release in the repo.',
+	);
 	process.exit(1);
 }
 

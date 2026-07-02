@@ -17,6 +17,9 @@ import { fileURLToPath } from 'node:url';
 // pnpm, yarn) from fetching the wrong one; older installers fetch both and
 // the launcher picks at runtime. Windows is never win32 in a name: npm's
 // spam filter blocks unscoped *-win32-* packages.
+// The one platform list. The launcher never keeps a copy: it derives the
+// package name by rule and checks the wrapper's optionalDependencies, which
+// this table generates.
 const TARGETS = {
 	'x86_64-unknown-linux-gnu': { name: 'overrule-linux-x64', os: 'linux', cpu: 'x64', libc: 'glibc', bin: 'overrule' },
 	'x86_64-unknown-linux-musl': { name: 'overrule-linux-x64-musl', os: 'linux', cpu: 'x64', libc: 'musl', bin: 'overrule' },
