@@ -98,15 +98,10 @@ writeFileSync(
 			engines: { node: '>=18' },
 			exports: {
 				'.': { types: './runtime/index.d.ts', default: './runtime/index.js' },
-				'./oracle': { types: './runtime/oracle.d.ts', default: './runtime/oracle.js' },
 				'./map': { types: './runtime/map-oracle.d.ts', default: './runtime/map-oracle.js' },
 				'./test': { types: './runtime/test.d.ts', default: './runtime/test.js' },
 				'./props': { types: './runtime/props.d.ts', default: './runtime/props.js' },
 			},
-			// tailwind-merge backs createTwMergeOracle only; the root entry never
-			// imports it, so it must not install by default.
-			peerDependencies: { 'tailwind-merge': '^3.0.0' },
-			peerDependenciesMeta: { 'tailwind-merge': { optional: true } },
 			optionalDependencies: Object.fromEntries(Object.values(TARGETS).map((p) => [p.name, version])),
 			files: ['bin', 'runtime'],
 		},

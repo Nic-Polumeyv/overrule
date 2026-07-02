@@ -2,9 +2,9 @@ export type ClassValue = ClassValue[] | Record<string, unknown> | string | numbe
 
 /**
  * A conflict oracle takes a class string and returns the tokens that lose.
- * An empty array means no token conflicts with another. Implementations live
- * on overrule/oracle; the root entry must stay free of them so importing
- * join pulls in no oracle and no tailwind-merge.
+ * An empty array means no token conflicts with another. The implementation
+ * lives on overrule/map; the root entry stays free of it so importing join
+ * pulls in no oracle at all.
  */
 export type Oracle = (classes: string) => string[];
 
@@ -76,11 +76,12 @@ function warnOnce(conflict: Conflict): void {
  * conflict. The output passes through unchanged. Wire it up in dev only:
  *
  *   import { join, guard } from 'overrule';
- *   import { defaultOracle } from 'overrule/oracle';
- *   const cn = import.meta.env.DEV ? guard(join, defaultOracle) : join;
+ *   import { createMapOracle } from 'overrule/map';
+ *   import map from './conflicts.json';
+ *   const cn = import.meta.env.DEV ? guard(join, createMapOracle(map)) : join;
  *
- * The dev-only branch is what keeps the oracle, and tailwind-merge behind
- * defaultOracle, out of production bundles.
+ * The map comes from `overrule map`, so the verdicts come from your own
+ * compiled stylesheet. The dev-only branch keeps all of it out of production.
  */
 export function guard<F extends (...args: never[]) => string>(
 	joinFn: F,

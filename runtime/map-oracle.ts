@@ -84,7 +84,7 @@ export function createMapOracle(map: ConflictMap): Oracle {
 			}
 		}
 
-		// First-appearance order, not walk order: matches createTwMergeOracle.
+		// First-appearance order, not walk order: losers read in source order.
 		return [...last.keys()].filter((token) => dropped.has(token));
 	};
 }

@@ -34,11 +34,12 @@ The npm package is the JavaScript runtime too. The root entry has no oracle and 
 
 ```ts
 import { join, guard } from 'overrule';
-import { defaultOracle } from 'overrule/oracle';
-const cn = import.meta.env.DEV ? guard(join, defaultOracle) : join;
+import { createMapOracle } from 'overrule/map';
+import map from './conflicts.json';
+const cn = import.meta.env.DEV ? guard(join, createMapOracle(map)) : join;
 ```
 
-tailwind-merge is an optional peer as of 0.5.0, needed only by `overrule/oracle`, whose `defaultOracle` is its tables. Skip it entirely if you want: `overrule map` compiles every token in your project with your real stylesheet into a conflict map, and `createMapOracle(map)` from `overrule/map` judges with that instead of name tables, no peer required.
+The map is yours: `npx overrule map src/ --css src/app.css --out conflicts.json` compiles every token in your project with your real stylesheet, and `createMapOracle` judges with that. No name tables, no tailwind-merge anywhere: as of 0.6.0 it is not a dependency, not a peer, nothing. It remains the reference the Rust tables were verified against, one verdict at a time.
 
 `join` concatenates clsx-style inputs and resolves nothing. `guard` wraps it and warns when a class string carries tokens that fight, so the conflict shows at dev time instead of leaving it to the cascade. `overrule/test` runs the same check in your suite through `assertMergeFree` and `assertVariantsMergeFree`. `declareVariants` builds a variant function from class strings with no merge engine behind it. The first three trace back to the [v0.3.1 tag](https://github.com/Nic-Polumeyv/overrule/tree/v0.3.1); the rest is newer.
 
