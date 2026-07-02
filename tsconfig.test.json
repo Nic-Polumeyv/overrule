@@ -1,0 +1,9 @@
+{
+	"extends": "./tsconfig.runtime.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"types": ["bun"]
+	},
+	"include": ["runtime"],
+	"exclude": []
+}

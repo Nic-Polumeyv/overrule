@@ -9,8 +9,8 @@ import { join, type ClassValue } from './index.js';
  * conflicting tokens are caught by guard()/the oracle, not silently merged away.
  *
  * `createMergeProps(options)` builds a merger. With no options it is platform-
- * neutral: a merged `style` stays a JS style object and no attribute is dropped,
- * matching react-aria. Opt into framework idioms by passing options — serialize
+ * neutral: a merged `style` stays a JS style object, no attribute is dropped,
+ * and same-named functions are chained. Opt into framework idioms by passing options — serialize
  * style to a string (`styleAs: 'string'`), drop boolean attrs set to false
  * (`dropFalseAttrs`), compose DOM handlers (`isEventHandler`). Framework-specific
  * policy is the consumer's to assemble; overrule ships only the engine.
@@ -287,7 +287,11 @@ type MergedStyle<O extends MergePropsOptions> = O extends { styleAs: 'string' } 
 export function createMergeProps<const O extends MergePropsOptions = MergePropsOptions>(options: O = {} as O) {
 	return function mergeProps<T extends (Props | null | undefined)[]>(
 		...args: T
-	): UnionToIntersection<TupleTypes<T>> & { style?: MergedStyle<O> } {
-		return mergePropsImpl(args, options) as UnionToIntersection<TupleTypes<T>> & { style?: MergedStyle<O> };
+	): Omit<UnionToIntersection<TupleTypes<T>>, 'style'> & { style?: MergedStyle<O> } {
+		// style is replaced, not intersected: the merged style's type comes from
+		// the options, never from intersecting the inputs' own style types.
+		return mergePropsImpl(args, options) as Omit<UnionToIntersection<TupleTypes<T>>, 'style'> & {
+			style?: MergedStyle<O>;
+		};
 	};
 }
