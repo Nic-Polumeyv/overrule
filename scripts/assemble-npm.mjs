@@ -81,11 +81,8 @@ cpSync(join(root, 'README.md'), join(wrapper, 'README.md'));
 cpSync(join(root, 'LICENSE'), join(wrapper, 'LICENSE'));
 // The JS runtime half: join/guard/test run in consumers' dev bundles; the binary is
 // the CLI half. runtime/ is JS + hand-written d.ts, shipped as-is with no build
-// step; only the test files stay behind.
-cpSync(join(root, 'runtime'), join(wrapper, 'runtime'), {
-	recursive: true,
-	filter: (src) => !src.endsWith('.test.ts'),
-});
+// step. The directory holds only what ships; tests live in tests/runtime.
+cpSync(join(root, 'runtime'), join(wrapper, 'runtime'), { recursive: true });
 writeFileSync(
 	join(wrapper, 'package.json'),
 	JSON.stringify(

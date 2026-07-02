@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 
-import { createMapOracle, type ConflictMap } from './map-oracle.js';
+import { createMapOracle, type ConflictMap } from '../../runtime/map-oracle.js';
 
 // Hand-written fixture, tailwind-flavored for readability. Buckets are opaque
 // keys from the oracle's point of view; the names here mean nothing to it.

@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 
-import { createMergeProps, mergeStyles, styleToObject, styleToString, type StyleObject } from './props.js';
+import { createMergeProps, mergeStyles, styleToObject, styleToString, type StyleObject } from '../../runtime/props.js';
 
 // Characterization pins for the props module. Every expectation below was
 // captured by running the implementation as of 707dbbe; quirks are pinned on

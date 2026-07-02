@@ -8,9 +8,9 @@ import {
 	type ClassValue,
 	type Conflict,
 	type Oracle,
-} from './index.js';
-import { createMapOracle } from './map-oracle.js';
-import { assertMergeFree, assertVariantsMergeFree } from './test.js';
+} from '../../runtime/index.js';
+import { createMapOracle } from '../../runtime/map-oracle.js';
+import { assertMergeFree, assertVariantsMergeFree } from '../../runtime/test.js';
 
 // A hand-written stylesheet map stands in for a generated one: enough tokens
 // for every contract in this file to contest realistically, nothing else.

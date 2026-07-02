@@ -3,6 +3,6 @@
 	"compilerOptions": {
 		"types": ["bun"]
 	},
-	"include": ["runtime"],
+	"include": ["runtime", "tests/runtime"],
 	"exclude": []
 }

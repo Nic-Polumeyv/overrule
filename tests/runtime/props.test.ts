@@ -7,7 +7,7 @@ import {
 	mergeStyles,
 	styleToObject,
 	styleToString,
-} from './props.js';
+} from '../../runtime/props.js';
 
 // ---- chain ----
 

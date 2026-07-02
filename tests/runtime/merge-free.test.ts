@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 
-import { declareVariants } from './index.js';
-import { createMapOracle } from './map-oracle.js';
+import { declareVariants } from '../../runtime/index.js';
+import { createMapOracle } from '../../runtime/map-oracle.js';
 
 const mapOracle = createMapOracle({
 	version: 1,
@@ -17,7 +17,7 @@ const mapOracle = createMapOracle({
 		'inline-flex': [{ bucket: '', props: ['display'] }],
 	},
 });
-import { assertMergeFree, assertVariantsMergeFree, combos, mergeFree } from './test.js';
+import { assertMergeFree, assertVariantsMergeFree, combos, mergeFree } from '../../runtime/test.js';
 
 // ---- combos ----
 
