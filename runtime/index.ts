@@ -19,17 +19,29 @@ export type Conflict = {
  */
 export function join(...inputs: ClassValue[]): string {
 	let out = '';
-	for (const input of inputs) {
-		if (!input || input === true) continue;
-		let part = '';
-		if (typeof input === 'object') {
-			if (Array.isArray(input)) part = join(...input);
-			else for (const key in input) if (input[key]) part += (part ? ' ' : '') + key;
-		} else {
-			part = String(input);
-		}
-		if (part) out += (out ? ' ' : '') + part;
+	for (let i = 0; i < inputs.length; i++) out = append(out, inputs[i]);
+	return out;
+}
+
+// clsx's value gate: strings and numbers render; bigint, functions, and
+// symbols are dropped even though bigint sits in the type (clsx carries the
+// same types-vs-runtime quirk). Arrays recurse by index, so a huge flat array
+// never hits the engine's argument-spread limit.
+function append(out: string, input: ClassValue): string {
+	if (!input || input === true) return out;
+
+	if (typeof input === 'string' || typeof input === 'number') {
+		return out ? out + ' ' + input : String(input);
 	}
+
+	if (typeof input !== 'object') return out;
+
+	if (Array.isArray(input)) {
+		for (let i = 0; i < input.length; i++) out = append(out, input[i]);
+		return out;
+	}
+
+	for (const key in input) if (input[key]) out = out ? out + ' ' + key : key;
 	return out;
 }
 
@@ -45,7 +57,9 @@ export function findConflicts(classes: string, oracle: Oracle = defaultOracle): 
 const reported = new Set<string>();
 
 function warnOnce(conflict: Conflict): void {
-	const signature = [...conflict.dropped].sort().join(' ');
+	// The input is part of the signature: different class strings can drop the
+	// same tokens, and each deserves its own warning.
+	const signature = conflict.input + '\n' + [...conflict.dropped].sort().join(' ');
 	if (reported.has(signature)) return;
 	reported.add(signature);
 	console.warn(

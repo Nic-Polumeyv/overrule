@@ -46,11 +46,52 @@ test('a merge-authored variant is caught', () => {
 	expect(() => assertMergeFree(bad())).toThrow(/px-2|px-4/);
 });
 
-test('assertVariantsMergeFree accepts a declareVariants function', () => {
-	// assertVariantsMergeFree takes the loose (props?: Record<string, string>) => string
-	// contract; declareVariants returns a stricter function, so widen it for the helper.
-	assertVariantsMergeFree(button as unknown as (props?: Record<string, string>) => string, {
-		size: ['sm', 'lg'],
-		tone: ['solid', 'ghost'],
+test('assertVariantsMergeFree accepts a typed declareVariants function directly', () => {
+	expect(() => assertVariantsMergeFree(button, { size: ['sm', 'lg'], tone: ['solid', 'ghost'] })).not.toThrow();
+});
+
+// ---- guardrails ----
+
+test('an unknown config key throws instead of silently dropping styling', () => {
+	expect(() => declareVariants({ base: 'x', compoundVariants: [] } as never)).toThrow(
+		/unknown config key "compoundVariants"/,
+	);
+});
+
+test('an unknown selection selects nothing, prototype chain included', () => {
+	expect(button({ size: 'huge' as never })).toBe('inline-flex items-center bg-black text-white');
+	expect(button({ size: 'toString' as never })).toBe('inline-flex items-center bg-black text-white');
+});
+
+test('boolean axes take real booleans', () => {
+	const toggle = declareVariants({
+		base: 'btn',
+		variants: { disabled: { true: 'is-disabled', false: 'is-enabled' } },
+		defaultVariants: { disabled: false },
 	});
+	expect(toggle()).toBe('btn is-enabled');
+	expect(toggle({ disabled: true })).toBe('btn is-disabled');
+	expect(toggle({ disabled: null })).toBe('btn');
+});
+
+test('a null default means no default for that axis', () => {
+	const plain = declareVariants({
+		base: 'b',
+		variants: { tone: { a: 'x' } },
+		defaultVariants: { tone: null },
+	});
+	expect(plain()).toBe('b');
+	expect(plain({ tone: 'a' })).toBe('b x');
+});
+
+test('the base-less props path does not leak a leading space either', () => {
+	const plain = declareVariants({ variants: { tone: { a: 'text-red-500' } }, defaultVariants: { tone: 'a' } });
+	expect(plain({ tone: 'a' })).toBe('text-red-500');
+	expect(plain({ tone: null, class: 'mt-1' })).toBe('mt-1');
+});
+
+test('a variants-less config still appends the caller class', () => {
+	expect(declareVariants({ base: 'card' })({ class: 'mt-2' })).toBe('card mt-2');
+	expect(declareVariants({})({ class: 'mt-2' })).toBe('mt-2');
+	expect(declareVariants({ base: 'card' })()).toBe('card');
 });

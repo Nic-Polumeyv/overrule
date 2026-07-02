@@ -104,7 +104,7 @@ test('className is joined too (React-shaped props)', () => {
 test('last value wins, but undefined does not clobber an earlier value', () => {
 	const merge = createMergeProps();
 	expect(merge({ id: 'x' }, { id: 'y' }).id).toBe('y');
-	expect(merge({ id: 'x' }, { id: undefined }).id).toBe('x');
+	expect(merge({ id: 'x' }, { id: undefined } as { id?: string }).id).toBe('x');
 });
 
 test('with no options, style stays an object and functions are chained', () => {
@@ -200,4 +200,51 @@ test('createMergeProps honors a custom isEventHandler (React onClick)', () => {
 	);
 	(merged.onClick as (e: typeof event) => void)(event);
 	expect(calls).toEqual(['first']);
+});
+
+// ---- boundary pins: the cases a plausible rewrite gets wrong ----
+
+test('styleToString keeps zero and empty-string values, skipping only nullish', () => {
+	expect(styleToString({ margin: 0, content: '', color: null })).toBe('margin: 0; content: ;');
+});
+
+test('null clobbers an earlier value; only undefined defers', () => {
+	const merge = createMergeProps();
+	expect(merge({ id: 'x' }, { id: null } as { id: string | null }).id).toBeNull();
+	// A null handler disables the earlier one by design: last wins for every
+	// non-undefined scalar, functions included.
+	expect(
+		merge({ onclick: () => {} }, { onclick: null } as { onclick: (() => void) | null }).onclick,
+	).toBeNull();
+});
+
+test('chained functions receive every argument and never short-circuit', () => {
+	const merge = createMergeProps();
+	const calls: unknown[][] = [];
+	const merged = merge(
+		{ notify: (...args: unknown[]) => calls.push(args) },
+		{ notify: (...args: unknown[]) => calls.push(args) },
+	);
+	(merged.notify as (...args: unknown[]) => void)({ defaultPrevented: true }, 'extra');
+	expect(calls).toEqual([
+		[{ defaultPrevented: true }, 'extra'],
+		[{ defaultPrevented: true }, 'extra'],
+	]);
+});
+
+test('dropFalseAttrs deletes exactly false, not other falsy values', () => {
+	const merge = createMergeProps({ dropFalseAttrs: ['hidden', 'disabled'] });
+	expect(merge({ hidden: 0 }).hidden).toBe(0);
+	expect(merge({ disabled: '' }).disabled).toBe('');
+});
+
+test('an undefined symbol value does not clobber an earlier one', () => {
+	const merge = createMergeProps();
+	const sym = Symbol('attach');
+	expect((merge({ [sym]: 1 }, { [sym]: undefined }) as Record<symbol, unknown>)[sym]).toBe(1);
+});
+
+test('styleAs:"string" leaves an unmerged string style untouched', () => {
+	const merge = createMergeProps({ styleAs: 'string' });
+	expect(merge({ style: 'color:red' }).style).toBe('color:red');
 });

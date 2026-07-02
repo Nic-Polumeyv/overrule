@@ -18,4 +18,10 @@ export function createTwMergeOracle(): Oracle {
 	};
 }
 
-export const defaultOracle: Oracle = createTwMergeOracle();
+let cached: Oracle | undefined;
+
+/**
+ * The default oracle, built on first use so importing join alone never
+ * constructs tailwind-merge's tables, in a bundle or on a server.
+ */
+export const defaultOracle: Oracle = (classes) => (cached ??= createTwMergeOracle())(classes);

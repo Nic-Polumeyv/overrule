@@ -52,8 +52,9 @@ export function combos(axes: Record<string, readonly string[]>): Record<string, 
  * produces a merge-free class string for every combination of its axes.
  * Run it in your test suite so merge-authored variants can never land.
  */
-export function assertVariantsMergeFree(
-	variants: (props?: Record<string, string>) => string,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function assertVariantsMergeFree<F extends (props?: any) => string>(
+	variants: F,
 	axes: Record<string, readonly string[]>,
 	oracle?: Oracle,
 ): void {

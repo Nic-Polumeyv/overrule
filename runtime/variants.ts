@@ -1,8 +1,18 @@
 export type VariantsSchema = Record<string, Record<string, string>>;
 
+/** An axis keyed 'true'/'false' accepts real booleans, the way cva types it. */
+type AxisValue<V> = V extends 'true' | 'false' ? boolean | V : V;
+
 export type VariantFn<S extends VariantsSchema> = (
-	props?: { [K in keyof S]?: keyof S[K] | null | undefined } & { class?: string },
+	props?: { [K in keyof S]?: AxisValue<keyof S[K]> | null | undefined } & { class?: string },
 ) => string;
+
+// Own-property lookup: a selection like 'toString' must select nothing, not
+// walk the prototype chain and inject function source into the class string.
+function pick(m: Record<string, string>, s: string | boolean): string | undefined {
+	const k = typeof s === 'boolean' ? String(s) : s;
+	return Object.hasOwn(m, k) ? m[k] : undefined;
+}
 
 /**
  * Build a variants function from a config of class strings. No merging.
@@ -13,8 +23,16 @@ export type VariantFn<S extends VariantsSchema> = (
 export function declareVariants<S extends VariantsSchema>(config: {
 	base?: string;
 	variants?: S;
-	defaultVariants?: { [K in keyof S]?: keyof S[K] };
+	defaultVariants?: { [K in keyof S]?: AxisValue<keyof S[K]> | null };
 }): VariantFn<S> {
+	// Unsupported config fails loudly instead of silently dropping styling.
+	// The type layer already rejects it; this catches untyped callers.
+	for (const key in config) {
+		if (key !== 'base' && key !== 'variants' && key !== 'defaultVariants') {
+			throw new Error(`declareVariants: unknown config key "${key}"; compoundVariants and slots are not supported`);
+		}
+	}
+
 	const b = config.base ?? '';
 	const v = config.variants as Record<string, Record<string, string>> | undefined;
 
@@ -24,11 +42,11 @@ export function declareVariants<S extends VariantsSchema>(config: {
 			: ((p?: { class?: string }) => p?.class ?? '')) as VariantFn<S>;
 	}
 
-	const d = (config.defaultVariants ?? {}) as Record<string, string | undefined>;
+	const d = (config.defaultVariants ?? {}) as Record<string, string | boolean | null | undefined>;
 	const a = Object.keys(v);
 	const n = a.length;
 	const m = new Array<Record<string, string>>(n);
-	const f = new Array<string | undefined>(n);
+	const f = new Array<string | boolean | null | undefined>(n);
 
 	for (let i = 0; i < n; i++) {
 		const k = a[i]!;
@@ -40,11 +58,11 @@ export function declareVariants<S extends VariantsSchema>(config: {
 
 	for (let i = 0; i < n; i++) {
 		const s = f[i];
-		const x = s == null ? undefined : m[i]![s];
+		const x = s == null ? undefined : pick(m[i]!, s);
 		if (x) z += z ? ' ' + x : x;
 	}
 
-	return ((p?: Record<string, string | null | undefined> & { class?: string }) => {
+	return ((p?: Record<string, string | boolean | null | undefined> & { class?: string }) => {
 		if (p == null) return z;
 
 		let o = b;
@@ -54,7 +72,7 @@ export function declareVariants<S extends VariantsSchema>(config: {
 			s = s === undefined ? f[i] : s;
 
 			if (s != null) {
-				const x = m[i]![s];
+				const x = pick(m[i]!, s);
 				if (x) o += o ? ' ' + x : x;
 			}
 		}
