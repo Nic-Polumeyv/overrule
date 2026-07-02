@@ -280,6 +280,66 @@ fn ack_outside_cross_is_an_error() {
 }
 
 #[test]
+fn map_emits_a_versioned_deterministic_conflict_map() {
+    if !tailwind_installed() {
+        eprintln!("skipped: run `bun install` so the bridge can resolve tailwindcss");
+        return;
+    }
+    let args = ["map", "tests/fixtures", "--css", "tests/fixtures/entry.css"];
+    let (code, out, err) = run(&args, &root(), false);
+    assert_eq!(code, 0, "stderr: {err}");
+    let data: serde_json::Value = serde_json::from_str(&out).expect("valid json");
+    assert_eq!(data["version"], serde_json::json!(1));
+
+    // h-9 comes from button.svelte; through a stock stylesheet it is one
+    // bare-bucket height declaration.
+    assert_eq!(
+        data["tokens"]["h-9"],
+        serde_json::json!([{"bucket": "", "props": ["height"]}])
+    );
+    // font-normal! comes from widget.tsx; importance lands in the bucket
+    // string, and its custom-property export is a declaration like any other.
+    let important = data["tokens"]["font-normal!"]
+        .as_array()
+        .expect("font-normal! groups");
+    assert_eq!(important.len(), 1);
+    assert_eq!(important[0]["bucket"], serde_json::json!(" !"));
+    assert_eq!(
+        important[0]["props"],
+        serde_json::json!(["--tw-font-weight", "font-weight"])
+    );
+    // The coverage table rides along, winner-first.
+    assert!(
+        data["covers"]["padding"]
+            .as_array()
+            .expect("covers entry")
+            .iter()
+            .any(|p| p == "padding-inline")
+    );
+
+    // Byte-identical across runs, stdout and --out both.
+    let (code, out_again, _) = run(&args, &root(), false);
+    assert_eq!(code, 0);
+    assert_eq!(out, out_again);
+
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("map.json");
+    let mut with_out = args.to_vec();
+    with_out.extend(["--out", file.to_str().unwrap()]);
+    let (code, piped, err) = run(&with_out, &root(), false);
+    assert_eq!(code, 0, "stderr: {err}");
+    assert!(piped.is_empty(), "stdout: {piped}");
+    assert_eq!(fs::read_to_string(&file).unwrap(), out);
+}
+
+#[test]
+fn map_without_css_is_a_clap_error() {
+    let (code, _, err) = run(&["map", "tests/fixtures"], &root(), false);
+    assert_ne!(code, 0);
+    assert!(err.contains("--css"), "stderr: {err}");
+}
+
+#[test]
 fn judge_takes_arguments_and_exits_1_on_a_conflict() {
     let (code, out, _) = run(&["judge", "p-2 p-4", "flex gap-2"], &root(), false);
     assert_eq!(code, 1);

@@ -1,0 +1,2 @@
+/* The map cli test's CSS entry; tailwindcss resolves from this repo's node_modules. */
+@import "tailwindcss";

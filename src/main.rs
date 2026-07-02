@@ -45,6 +45,8 @@ enum Command {
     Cross(CrossArgs),
     /// judge class strings given as arguments or on stdin, one per line
     Judge(JudgeArgs),
+    /// emit the stylesheet-derived conflict map for the JS dev-time oracle
+    Map(MapArgs),
 }
 
 #[derive(Args)]
@@ -75,6 +77,21 @@ struct CrossArgs {
 }
 
 #[derive(Args)]
+struct MapArgs {
+    /// paths to scan for class literals; node_modules, dist, and friends are skipped
+    #[arg(default_value = ".")]
+    paths: Vec<PathBuf>,
+    /// the CSS entry that imports tailwindcss. Required: the map exists to
+    /// carry your real stylesheet's verdicts, theme, prefix, and custom
+    /// utilities included.
+    #[arg(long, value_name = "file")]
+    css: PathBuf,
+    /// write the map here instead of stdout
+    #[arg(long, value_name = "file")]
+    out: Option<PathBuf>,
+}
+
+#[derive(Args)]
 struct JudgeArgs {
     /// class strings to judge; with none given, one per line is read from stdin
     literals: Vec<String>,
@@ -98,6 +115,7 @@ fn main() -> ExitCode {
         Command::Fix(args) => check_or_fix(args, true),
         Command::Cross(args) => cross(args),
         Command::Judge(args) => judge(args),
+        Command::Map(args) => map(args),
     }
 }
 
@@ -119,12 +137,12 @@ impl Oracle for TokenCollector {
     }
 }
 
-/// Compile every token the scan will encounter, once, and build both
-/// stylesheet oracles from the result.
-fn css_oracles(
+/// Collect every token the scan will encounter and compile the whole set in
+/// one batch.
+fn compiled_candidates(
     files: &[SourceFile],
     css_entry: Option<&PathBuf>,
-) -> Result<(CssOracle, TypoOracle), String> {
+) -> Result<CompiledCandidates, String> {
     let collector = TokenCollector::default();
     scan_files(files, &collector);
     let mut tokens: Vec<String> = collector
@@ -135,7 +153,15 @@ fn css_oracles(
         .collect();
     tokens.sort_unstable();
     let asts = compile_candidates(&tokens, css_entry.map(PathBuf::as_path))?;
-    let compiled = CompiledCandidates::from_asts(asts);
+    Ok(CompiledCandidates::from_asts(asts))
+}
+
+/// Both stylesheet oracles from one compiled batch.
+fn css_oracles(
+    files: &[SourceFile],
+    css_entry: Option<&PathBuf>,
+) -> Result<(CssOracle, TypoOracle), String> {
+    let compiled = compiled_candidates(files, css_entry)?;
     let typos = TypoOracle::new(&compiled);
     Ok((CssOracle::new(compiled), typos))
 }
@@ -163,12 +189,16 @@ fn annotate(file: &str, line: usize, message: &str) {
     );
 }
 
-fn print_json(value: &serde_json::Value) {
+fn json_string(value: &serde_json::Value) -> String {
     let mut buf = Vec::new();
     let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
     let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
     serde::Serialize::serialize(value, &mut ser).expect("json values serialize");
-    println!("{}", String::from_utf8(buf).expect("serde_json emits utf8"));
+    String::from_utf8(buf).expect("serde_json emits utf8")
+}
+
+fn print_json(value: &serde_json::Value) {
+    println!("{}", json_string(value));
 }
 
 fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
@@ -268,6 +298,35 @@ fn judge(args: JudgeArgs) -> ExitCode {
     } else {
         ExitCode::FAILURE
     }
+}
+
+/// Emit the conflict map: the scanned tokens' declaration groups plus the
+/// coverage table, compiled through the project's own stylesheet. The map is
+/// data for the JS map oracle, not a verdict, so a successful emit exits 0
+/// whatever the tokens conflict on. File output ends with the same newline
+/// stdout gets, so both routes are byte-identical and diffable.
+fn map(args: MapArgs) -> ExitCode {
+    let files = read_paths(&args.paths);
+    let compiled = match compiled_candidates(&files, Some(&args.css)) {
+        Ok(compiled) => compiled,
+        Err(message) => {
+            eprintln!("{message}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let map = compiled.conflict_map();
+    match &args.out {
+        Some(path) => {
+            let mut contents = json_string(&map);
+            contents.push('\n');
+            if let Err(e) = std::fs::write(path, contents) {
+                eprintln!("could not write {}: {e}", path.display());
+                return ExitCode::FAILURE;
+            }
+        }
+        None => print_json(&map),
+    }
+    ExitCode::SUCCESS
 }
 
 fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
