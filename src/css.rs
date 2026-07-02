@@ -56,14 +56,32 @@ const NON_SCOPING: &[&str] = &["@property", "@keyframes", "@font-face", "@counte
 
 fn unescape(selector: &str) -> String {
     let mut out = String::with_capacity(selector.len());
-    let mut chars = selector.chars();
+    let mut chars = selector.chars().peekable();
     while let Some(ch) = chars.next() {
-        if ch == '\\' {
-            if let Some(next) = chars.next() {
-                out.push(next);
-            }
-        } else {
+        if ch != '\\' {
             out.push(ch);
+            continue;
+        }
+        // A hex escape is 1-6 hex digits plus one optional whitespace
+        // terminator; CSS spells a leading digit this way, so `.\32 xl\:p-4`
+        // must come back as `.2xl:p-4`, not `.32 xl:p-4`.
+        if chars.peek().is_some_and(char::is_ascii_hexdigit) {
+            let mut code = 0;
+            let mut digits = 0;
+            while digits < 6 {
+                let Some(digit) = chars.peek().and_then(|c| c.to_digit(16)) else {
+                    break;
+                };
+                code = code * 16 + digit;
+                digits += 1;
+                chars.next();
+            }
+            if chars.peek().is_some_and(|c| c.is_whitespace()) {
+                chars.next();
+            }
+            out.push(char::from_u32(code).unwrap_or(char::REPLACEMENT_CHARACTER));
+        } else if let Some(next) = chars.next() {
+            out.push(next);
         }
     }
     out
@@ -683,6 +701,35 @@ mod tests {
         let p = prefixed();
         assert_eq!(losers(&p, "tw:p-2 tw:p-4"), ["tw:p-2"]);
         assert!(losers(&p, "p-2 p-4").is_empty());
+    }
+
+    #[test]
+    fn unescape_decodes_hex_escapes_and_keeps_identity_escapes() {
+        assert_eq!(unescape(r"\32 xl\:p-4"), "2xl:p-4");
+        assert_eq!(unescape(r"\[padding\:1rem\]"), "[padding:1rem]");
+    }
+
+    #[test]
+    fn digit_leading_candidates_match_their_own_escaped_selector() {
+        // CSS escapes a leading digit as a hex escape with a space
+        // terminator: 2xl:p-4 compiles to `.\32 xl\:p-4`. The own-selector
+        // match must decode that back to the candidate, or the selector
+        // becomes a phantom condition and the pair never contests.
+        let o = CssOracle::new(compiled(
+            r#"{
+	"2xl:p-2": [{"kind": "rule", "selector": ".\\32 xl\\:p-2", "nodes": [
+		{"kind": "at-rule", "name": "@media", "params": "(width >= 96rem)", "nodes": [
+			{"kind": "declaration", "property": "padding", "important": false}
+		]}
+	]}],
+	"2xl:p-4": [{"kind": "rule", "selector": ".\\32 xl\\:p-4", "nodes": [
+		{"kind": "at-rule", "name": "@media", "params": "(width >= 96rem)", "nodes": [
+			{"kind": "declaration", "property": "padding", "important": false}
+		]}
+	]}]
+}"#,
+        ));
+        assert_eq!(losers(&o, "2xl:p-2 2xl:p-4"), ["2xl:p-2"]);
     }
 
     #[test]

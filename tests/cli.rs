@@ -41,7 +41,31 @@ fn check_json_machine_output_same_exit_code() {
     assert_eq!(findings.len(), 3);
     assert!(findings[0]["file"].is_string());
     assert!(findings[0]["fixed"].is_string());
+    assert_eq!(findings[0]["line"], serde_json::json!(7));
+    assert_eq!(
+        findings[0]["literal"],
+        serde_json::json!("px-4 px-2 text-sm")
+    );
+    assert_eq!(findings[0]["dropped"], serde_json::json!(["px-4"]));
     assert_eq!(data["unknown"].as_array().expect("unknown array").len(), 0);
+}
+
+#[test]
+fn check_without_json_exits_1_and_names_the_dropped_token_clean_exits_0() {
+    let (code, out, _) = run(&["check", "tests/fixtures"], &root(), false);
+    assert_eq!(code, 1);
+    assert!(out.contains("drops  h-9"), "out: {out}");
+    assert!(out.contains("Run \"overrule fix\""), "out: {out}");
+
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("clean.svelte"),
+        "<div class=\"flex h-9 items-center\">x</div>\n",
+    )
+    .unwrap();
+    let (code, out, _) = run(&["check", dir.path().to_str().unwrap()], &root(), false);
+    assert_eq!(code, 0);
+    assert!(out.contains("no class conflicts found"), "out: {out}");
 }
 
 #[test]
@@ -108,6 +132,44 @@ fn a_snapshot_silences_known_disagreements_anything_new_exits_1() {
     assert_eq!(code, 1);
     assert!(out.contains("leading-snug"), "out: {out}");
     assert!(out.contains("1 new disagreement"), "out: {out}");
+}
+
+#[test]
+fn an_ack_follows_the_literal_across_files_and_lines() {
+    if !tailwind_installed() {
+        eprintln!("skipped: run `bun install` so the bridge can resolve tailwindcss");
+        return;
+    }
+    // The signature ignores file and line on purpose: an acknowledged string
+    // stays acknowledged when it moves or gets copied.
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("a.svelte"),
+        "<div class=\"leading-snug text-xs\">x</div>\n",
+    )
+    .unwrap();
+    let target = dir.path().to_str().unwrap();
+    let (code, out, err) = run(&["cross", target, "--json"], &root(), false);
+    assert_eq!(code, 0, "stderr: {err}");
+    let ack_path = dir.path().join("acks.json");
+    fs::write(&ack_path, &out).unwrap();
+
+    fs::remove_file(dir.path().join("a.svelte")).unwrap();
+    fs::write(
+        dir.path().join("b.svelte"),
+        "<span>moved</span>\n<div class=\"leading-snug text-xs\">x</div>\n",
+    )
+    .unwrap();
+    let (code, out, _) = run(
+        &["cross", target, "--ack", ack_path.to_str().unwrap()],
+        &root(),
+        false,
+    );
+    assert_eq!(code, 0, "out: {out}");
+    assert!(
+        out.contains("no new disagreements, 1 acknowledged"),
+        "out: {out}"
+    );
 }
 
 #[test]
