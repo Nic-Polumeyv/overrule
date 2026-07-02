@@ -43,6 +43,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The binary reports the crate version, npm reports the tag; 0.4.8
+      # shipped self-reporting 0.4.7 because nothing tied them together.
+      - run: grep -q "^version = \"${GITHUB_REF_NAME#v}\"" Cargo.toml
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: oven-sh/setup-bun@v2
