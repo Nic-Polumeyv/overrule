@@ -113,6 +113,41 @@ function isVendorPrefixed(name: string): boolean {
 	return name.startsWith('-webkit-') || name.startsWith('-moz-') || name.startsWith('-ms-') || name.startsWith('-o-');
 }
 
+/** Remove CSS block comments outside quoted strings. Comments behave like whitespace in declaration text. */
+function stripComments(css: string): string {
+	let out = '';
+	let quote = '';
+
+	for (let i = 0; i < css.length; i++) {
+		const c = css[i]!;
+
+		if (quote) {
+			out += c;
+			if (c === quote) quote = '';
+			continue;
+		}
+
+		if (c === '"' || c === "'") {
+			quote = c;
+			out += c;
+			continue;
+		}
+
+		if (c === '/' && css[i + 1] === '*') {
+			if (out && !/\s$/.test(out)) out += ' ';
+			i += 2;
+			while (i < css.length && !(css[i] === '*' && css[i + 1] === '/')) i++;
+			if (i < css.length) i++;
+			if (out && !/\s$/.test(out)) out += ' ';
+			continue;
+		}
+
+		out += c;
+	}
+
+	return out;
+}
+
 /** Split a declaration list on top-level `;`, ignoring `;` inside parens or quotes (so url(...) and quoted values survive). */
 function splitDeclarations(css: string): string[] {
 	const out: string[] = [];
@@ -145,7 +180,7 @@ export function styleToObject(css?: string | null): StyleObject {
 	const out: StyleObject = {};
 	if (!css) return out;
 
-	for (const decl of splitDeclarations(css)) {
+	for (const decl of splitDeclarations(stripComments(css))) {
 		const colon = decl.indexOf(':');
 		if (colon === -1) continue;
 		const name = decl.slice(0, colon).trim();

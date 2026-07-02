@@ -63,6 +63,17 @@ test('styleToObject parses customs, vendor prefixes, and values with semicolons'
 	});
 });
 
+test('styleToObject ignores block comments outside quoted strings', () => {
+	expect(styleToObject('/* lead */ color: red; /* middle */ background: blue;')).toEqual({
+		color: 'red',
+		background: 'blue',
+	});
+	expect(styleToObject('color: red /* inline */; content: "/* not a comment */";')).toEqual({
+		color: 'red',
+		content: '"/* not a comment */"',
+	});
+});
+
 test('styleToString hyphenates camelCase, leaves customs, and skips nullish', () => {
 	expect(
 		styleToString({ backgroundColor: 'red', '--x': '1px', WebkitBoxShadow: '0 0', color: undefined }),
