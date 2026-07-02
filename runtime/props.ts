@@ -113,8 +113,40 @@ function isVendorPrefixed(name: string): boolean {
 	return name.startsWith('-webkit-') || name.startsWith('-moz-') || name.startsWith('-ms-') || name.startsWith('-o-');
 }
 
+// Property-name conversions are pure and the name universe is tiny (low
+// hundreds), while parses/serializes recur per frame. Past the cap new names
+// compute uncached; nothing is evicted.
+const NAME_CACHE_MAX = 1000;
+const objectKeyCache = new Map<string, string>();
+const cssPropCache = new Map<string, string>();
+
+/** CSS declaration name to style-object key: `--` passthrough, allowlisted vendor PascalCase, else camelCase. */
+function toObjectKey(name: string): string {
+	const hit = objectKeyCache.get(name);
+	if (hit !== undefined) return hit;
+	const key = name.startsWith('--') ? name : isVendorPrefixed(name) ? pascalCase(name) : camelCase(name);
+	if (objectKeyCache.size < NAME_CACHE_MAX) objectKeyCache.set(name, key);
+	return key;
+}
+
+function kebabChar(m: string): string {
+	return '-' + m.toLowerCase();
+}
+
+/** Style-object key to CSS property name: `--` passthrough, else each ASCII uppercase becomes -lower. */
+function toCssProp(key: string): string {
+	const hit = cssPropCache.get(key);
+	if (hit !== undefined) return hit;
+	const prop = key.startsWith('--') ? key : key.replace(/[A-Z]/g, kebabChar);
+	if (cssPropCache.size < NAME_CACHE_MAX) cssPropCache.set(key, prop);
+	return prop;
+}
+
 /** Remove CSS block comments outside quoted strings. Comments behave like whitespace in declaration text. */
 function stripComments(css: string): string {
+	// generated styles carry no comments: without '/*' the rebuild is identity
+	if (!css.includes('/*')) return css;
+
 	let out = '';
 	let quote = '';
 
@@ -148,8 +180,18 @@ function stripComments(css: string): string {
 	return out;
 }
 
+const QUOTE_OR_PAREN = /["'(]/;
+
 /** Split a declaration list on top-level `;`, ignoring `;` inside parens or quotes (so url(...) and quoted values survive). */
 function splitDeclarations(css: string): string[] {
+	// no quotes or parens: every ';' is top-level; a stray ')' never changes depth
+	if (!QUOTE_OR_PAREN.test(css)) {
+		const parts = css.split(';');
+		// the scanner never emits the empty segment after a trailing ';'
+		if (parts[parts.length - 1] === '') parts.pop();
+		return parts;
+	}
+
 	const out: string[] = [];
 	let depth = 0;
 	let quote = '';
@@ -187,9 +229,7 @@ export function styleToObject(css?: string | null): StyleObject {
 		if (!name) continue;
 		const value = decl.slice(colon + 1).trim();
 
-		if (name.startsWith('--')) out[name] = value;
-		else if (isVendorPrefixed(name)) out[pascalCase(name)] = value;
-		else out[camelCase(name)] = value;
+		out[toObjectKey(name)] = value;
 	}
 
 	return out;
@@ -201,20 +241,28 @@ export function styleToString(style: StyleObject): string {
 	for (const key in style) {
 		const value = style[key];
 		if (value == null) continue;
-		const prop = key.startsWith('--') ? key : key.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
-		out += `${out ? ' ' : ''}${prop}: ${value};`;
+		out += `${out ? ' ' : ''}${toCssProp(key)}: ${value};`;
 	}
 	return out;
 }
 
 /** Merge style objects and/or CSS strings into one style object. Later values win. */
 export function mergeStyles(...styles: (string | StyleObject | null | undefined)[]): StyleObject {
-	let out: StyleObject = {};
+	let out: StyleObject | undefined;
 	for (const style of styles) {
-		const obj = typeof style === 'string' ? styleToObject(style) : style && typeof style === 'object' ? style : null;
-		if (obj) out = { ...out, ...obj };
+		if (typeof style === 'string') {
+			// parse output is fresh and plain (never an own __proto__ key): adopt or copy in place
+			if (out === undefined) out = styleToObject(style);
+			else Object.assign(out, styleToObject(style));
+		} else if (style && typeof style === 'object') {
+			// [[Set]] would route an own '__proto__' key to the prototype setter;
+			// spread keeps it an own data key, so that shape stays on the old path
+			if (Object.prototype.hasOwnProperty.call(style, '__proto__')) out = { ...out, ...style };
+			else if (out === undefined) out = Object.assign({}, style);
+			else Object.assign(out, style);
+		}
 	}
-	return out;
+	return out ?? {};
 }
 
 // ---- the umbrella ----
