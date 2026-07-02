@@ -125,7 +125,7 @@ fn without_losers(literal: &str, dropped: &[String]) -> String {
 static ATTR_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"\bclass(?:Name)?=(?:"([^"']+)"|'([^"']+)')"#).unwrap());
 static CALL_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\b(?:cn|cx|clsx|tv|cva|declareVariants)\s*\(").unwrap());
+    LazyLock::new(|| Regex::new(r"\b(?:cn|cx|clsx|tv|cva|join|declareVariants)\s*\(").unwrap());
 
 /// Collect string literals inside a call's balanced parens, at any nesting
 /// depth. Byte indices are safe: every delimiter is ASCII and an ASCII byte in
@@ -139,6 +139,20 @@ fn literals_in_call(src: &str, open_paren: usize) -> Vec<Literal<'_>> {
         match bytes[i] {
             b'(' => depth += 1,
             b')' => depth -= 1,
+            // Comments between arguments can carry stray quotes (don't, `x`)
+            // that would open a phantom string and swallow real literals.
+            b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'/' => {
+                while i < bytes.len() && bytes[i] != b'\n' {
+                    i += 1;
+                }
+            }
+            b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'*' => {
+                i += 2;
+                while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                    i += 1;
+                }
+                i += 1;
+            }
             quote @ (b'"' | b'\'' | b'`') => {
                 let start = i + 1;
                 i += 1;
@@ -304,6 +318,27 @@ mod tests {
             without_losers("p-2 m-1 p-2 m-2", &["m-1".to_string()]),
             "p-2 m-2"
         );
+    }
+
+    #[test]
+    fn join_calls_are_scanned_in_script_and_markup() {
+        // The runtime's own join() replaced cn() at most call sites; the
+        // scanner has to know the name or those literals go unwatched.
+        let findings = scan_source("const c = join('a loser b', extra);", &fake);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].dropped, ["loser"]);
+
+        let findings = scan_source("<div class={join('a loser b', className)}>", &fake);
+        assert_eq!(findings.len(), 1);
+    }
+
+    #[test]
+    fn comments_between_call_args_do_not_open_phantom_strings() {
+        let src = "join(\n  // we don't want ticks\n  'a loser b',\n  /* nor \"rules\" */\n  'c d',\n)";
+        let findings = scan_source(src, &fake);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].dropped, ["loser"]);
+        assert_eq!(findings[0].fixed, "a b");
     }
 
     #[test]
