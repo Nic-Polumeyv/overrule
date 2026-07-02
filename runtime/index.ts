@@ -1,14 +1,19 @@
-import { defaultOracle, type Oracle } from './oracle.js';
-
-export { createTwMergeOracle, defaultOracle, type Oracle } from './oracle.js';
 export { declareVariants, type VariantProps } from './variants.js';
 
 export type ClassValue = ClassValue[] | Record<string, unknown> | string | number | bigint | null | boolean | undefined;
 
+/**
+ * A conflict oracle takes a class string and returns the tokens that lose.
+ * An empty array means no token conflicts with another. Implementations live
+ * on overrule/oracle; the root entry must stay free of them so importing
+ * join pulls in no oracle and no tailwind-merge.
+ */
+export type Oracle = (classes: string) => string[];
+
 export type Conflict = {
 	/** The full class string that was checked. */
 	input: string;
-	/** Tokens that tailwind-merge would drop, meaning the cascade decides instead of you. */
+	/** Tokens the oracle would drop, meaning the cascade decides instead of you. */
 	dropped: string[];
 };
 
@@ -47,9 +52,9 @@ function append(out: string, input: ClassValue): string {
 
 /**
  * Returns the tokens the oracle considers losers in a class string, or null
- * when nothing conflicts. The default oracle is tailwind-merge.
+ * when nothing conflicts.
  */
-export function findConflicts(classes: string, oracle: Oracle = defaultOracle): Conflict | null {
+export function findConflicts(classes: string, oracle: Oracle): Conflict | null {
 	const dropped = oracle(classes);
 	return dropped.length > 0 ? { input: classes, dropped } : null;
 }
@@ -72,14 +77,17 @@ function warnOnce(conflict: Conflict): void {
  * Wraps a class join function and reports any class string whose tokens
  * conflict. The output passes through unchanged. Wire it up in dev only:
  *
- *   const cn = import.meta.env.DEV ? guard(base) : base;
+ *   import { join, guard } from 'overrule';
+ *   import { defaultOracle } from 'overrule/oracle';
+ *   const cn = import.meta.env.DEV ? guard(join, defaultOracle) : join;
  *
- * Bundlers eliminate the guard (and tailwind-merge with it) from production.
+ * The dev-only branch is what keeps the oracle, and tailwind-merge behind
+ * defaultOracle, out of production bundles.
  */
 export function guard<F extends (...args: never[]) => string>(
 	joinFn: F,
+	oracle: Oracle,
 	onConflict: (conflict: Conflict) => void = warnOnce,
-	oracle: Oracle = defaultOracle,
 ): F {
 	const guarded = (...args: never[]): string => {
 		const out = joinFn(...args);

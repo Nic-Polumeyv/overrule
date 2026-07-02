@@ -4,13 +4,13 @@ import { findConflicts, type Oracle } from './index.js';
  * Check a class string for conflicts. ok means the oracle would change
  * nothing: every token survives, so the string needs no runtime referee.
  */
-export function mergeFree(classes: string, oracle?: Oracle): { ok: boolean; dropped: string[] } {
+export function mergeFree(classes: string, oracle: Oracle): { ok: boolean; dropped: string[] } {
 	const conflict = findConflicts(classes, oracle);
 	return conflict ? { ok: false, dropped: conflict.dropped } : { ok: true, dropped: [] };
 }
 
 /** Throws when a class string has conflicting tokens, listing exactly which ones lose. */
-export function assertMergeFree(classes: string, oracle?: Oracle): void {
+export function assertMergeFree(classes: string, oracle: Oracle): void {
 	const conflict = findConflicts(classes, oracle);
 
 	if (conflict) {
@@ -56,7 +56,7 @@ export function combos(axes: Record<string, readonly string[]>): Record<string, 
 export function assertVariantsMergeFree<F extends (props?: any) => string>(
 	variants: F,
 	axes: Record<string, readonly string[]>,
-	oracle?: Oracle,
+	oracle: Oracle,
 ): void {
 	const keys = Object.keys(axes);
 	const n = keys.length;

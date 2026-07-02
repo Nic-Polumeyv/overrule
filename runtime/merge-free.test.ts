@@ -1,6 +1,7 @@
 import { test, expect } from 'bun:test';
 
 import { declareVariants } from './index.js';
+import { defaultOracle } from './oracle.js';
 import { assertMergeFree, assertVariantsMergeFree, combos, mergeFree } from './test.js';
 
 // ---- combos ----
@@ -19,13 +20,13 @@ test('combos builds the full cartesian product, last axis included', () => {
 // ---- mergeFree / assertMergeFree ----
 
 test('mergeFree is ok for a clean string and lists losers otherwise', () => {
-	expect(mergeFree('p-2 m-2')).toEqual({ ok: true, dropped: [] });
-	expect(mergeFree('p-2 p-4')).toEqual({ ok: false, dropped: ['p-2'] });
+	expect(mergeFree('p-2 m-2', defaultOracle)).toEqual({ ok: true, dropped: [] });
+	expect(mergeFree('p-2 p-4', defaultOracle)).toEqual({ ok: false, dropped: ['p-2'] });
 });
 
 test('assertMergeFree throws naming the losers', () => {
-	expect(() => assertMergeFree('p-2 m-2')).not.toThrow();
-	expect(() => assertMergeFree('p-2 p-4')).toThrow(/"p-2".*p-2 p-4/);
+	expect(() => assertMergeFree('p-2 m-2', defaultOracle)).not.toThrow();
+	expect(() => assertMergeFree('p-2 p-4', defaultOracle)).toThrow(/"p-2".*p-2 p-4/);
 });
 
 // ---- assertVariantsMergeFree ----
@@ -40,7 +41,7 @@ test('a conflict hiding in the last combination of the last axis is found', () =
 	});
 
 	expect(() =>
-		assertVariantsMergeFree(badge, { tone: ['plain', 'loud'], pad: ['none', 'big'] }),
+		assertVariantsMergeFree(badge, { tone: ['plain', 'loud'], pad: ['none', 'big'] }, defaultOracle),
 	).toThrow(/\{"tone":"plain","pad":"big"\}.*"p-2"/);
 });
 
@@ -51,5 +52,5 @@ test('a merge-free variants function passes every combination', () => {
 	});
 
 	// Typed variants functions are accepted without a widening cast.
-	expect(() => assertVariantsMergeFree(clean, { size: ['sm', 'lg'] })).not.toThrow();
+	expect(() => assertVariantsMergeFree(clean, { size: ['sm', 'lg'] }, defaultOracle)).not.toThrow();
 });
