@@ -1,6 +1,6 @@
 # overrule
 
-tailwind-merge as a dev tool, kept out of your production bundle. The CLI is Rust now.
+tailwind-merge as a dev tool, not a dependency at all. The CLI is Rust now.
 
 `check` reports class strings whose tokens fight and exits 1. `fix` rewrites each one to the form the merge would have produced, so it cannot change a pixel. `cross` compares the name tables against your compiled stylesheet and prints every disagreement. Same contract as the 0.3.x npm CLI, byte for byte where the engines agree: same text output, same JSON shapes, same exit codes, and ack snapshots interop both ways.
 
@@ -30,12 +30,15 @@ npx overrule cross src/ --ack acks.json       # CI gate: new disagreements only
 
 ## Runtime
 
-The npm package is the JavaScript runtime too. The manifest declares `sideEffects: false` and the default oracle is built on first use, so importing `join` alone pulls no tailwind-merge into any bundle, Rollup or esbuild alike. Wire the guard in dev and it vanishes in prod:
+The npm package is the JavaScript runtime too. The root entry has no oracle and no tailwind-merge in its import graph at all; oracles are explicit, imported from `overrule/oracle` and passed in. The manifest declares `sideEffects: false`, so when the DEV branch folds away, the oracle import goes with it. Wire the guard in dev and it vanishes in prod:
 
 ```ts
 import { join, guard } from 'overrule';
-const cn = import.meta.env.DEV ? guard(join) : join;
+import { defaultOracle } from 'overrule/oracle';
+const cn = import.meta.env.DEV ? guard(join, defaultOracle) : join;
 ```
+
+tailwind-merge is an optional peer as of 0.5.0, needed only by `overrule/oracle`, whose `defaultOracle` is its tables. Skip it entirely if you want: `overrule map` compiles every token in your project with your real stylesheet into a conflict map, and `createMapOracle(map)` from `overrule/map` judges with that instead of name tables, no peer required.
 
 `join` concatenates clsx-style inputs and resolves nothing. `guard` wraps it and warns when a class string carries tokens that fight, so the conflict shows at dev time instead of leaving it to the cascade. `overrule/test` runs the same check in your suite through `assertMergeFree` and `assertVariantsMergeFree`. `declareVariants` builds a variant function from class strings with no merge engine behind it. The first three trace back to the [v0.3.1 tag](https://github.com/Nic-Polumeyv/overrule/tree/v0.3.1); the rest is newer.
 
