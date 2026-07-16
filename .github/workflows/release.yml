@@ -30,7 +30,7 @@ jobs:
             runner: windows-11-arm
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -41,7 +41,7 @@ jobs:
       - run: sudo apt-get install -y musl-tools
         if: matrix.target == 'x86_64-unknown-linux-musl'
       - run: cargo build --release --target ${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: |
@@ -49,34 +49,30 @@ jobs:
             target/${{ matrix.target }}/release/overrule.exe
 
   test:
+    uses: ./.github/workflows/ci.yml
+
+  version-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The binary reports the crate version, npm reports the tag; 0.4.8
       # shipped self-reporting 0.4.7 because nothing tied them together.
       - run: grep -q "^version = \"${GITHUB_REF_NAME#v}\"" Cargo.toml
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-      - run: cargo test
-      - run: bun test
-      - run: bunx tsc -p tsconfig.test.json
 
   release:
-    needs: [build, test]
+    needs: [build, test, version-check]
     runs-on: ubuntu-latest
     permissions:
       id-token: write # OIDC trusted publishing — no NPM_TOKEN, no OTP
       contents: write # gh release create
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
       - run: npm install -g npm@latest # trusted publishing needs npm >= 11.5.1
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: binaries
       - run: node scripts/assemble-npm.mjs "${GITHUB_REF_NAME#v}" binaries dist-npm
