@@ -1,23 +1,8 @@
 import { test, expect } from 'bun:test';
 
 import { declareVariants } from '../../runtime/index.js';
-import { createMapOracle } from '../../runtime/map-oracle.js';
-
-const mapOracle = createMapOracle({
-	version: 1,
-	covers: {},
-	tokens: {
-		'p-2': [{ bucket: '', props: ['padding'] }],
-		'p-4': [{ bucket: '', props: ['padding'] }],
-		'm-2': [{ bucket: '', props: ['margin'] }],
-		'text-black': [{ bucket: '', props: ['color'] }],
-		'text-red-500': [{ bucket: '', props: ['color'] }],
-		'h-8': [{ bucket: '', props: ['height'] }],
-		'h-11': [{ bucket: '', props: ['height'] }],
-		'inline-flex': [{ bucket: '', props: ['display'] }],
-	},
-});
 import { assertMergeFree, assertVariantsMergeFree, combos, mergeFree } from '../../runtime/test.js';
+import { mapOracle } from './oracle-fixture.js';
 
 // ---- combos ----
 
