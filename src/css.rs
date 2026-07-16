@@ -21,6 +21,7 @@ use std::sync::LazyLock;
 use serde::Deserialize;
 
 use crate::oracle::Oracle;
+use crate::parse::order_normalize;
 
 /// One node of Tailwind's compiled AST, the shape candidatesToAst returns
 /// (available since tailwindcss 4.2). Unknown fields are ignored.
@@ -137,8 +138,8 @@ fn collect(nodes: &[AstNode], conditions: &[String], candidate: &str, out: &mut 
 /// plain pseudo-class or attribute selectors on &. A condition that reaches a
 /// different box (a pseudo-element, or any selector with a combinator) makes
 /// everything nested inside it apply there, so its position pins the stretch
-/// boundaries and each stretch sorts on its own. Same reasoning as bucket_of
-/// in parse.rs, applied to compiled output.
+/// boundaries. Same reasoning as bucket_of in parse.rs, applied to compiled
+/// output; `order_normalize` there does the sorting for both.
 fn bucket_of(conditions: &[String], important: bool) -> String {
     fn sensitive(condition: &str) -> bool {
         !condition.starts_with('@')
@@ -147,20 +148,7 @@ fn bucket_of(conditions: &[String], important: bool) -> String {
                     .chars()
                     .any(|c| c.is_whitespace() || matches!(c, '>' | '+' | '~')))
     }
-    let mut normalized: Vec<&str> = Vec::new();
-    let mut segment: Vec<&str> = Vec::new();
-    for condition in conditions {
-        if sensitive(condition) {
-            segment.sort_unstable();
-            normalized.append(&mut segment);
-            normalized.push(condition);
-        } else {
-            segment.push(condition);
-        }
-    }
-    segment.sort_unstable();
-    normalized.append(&mut segment);
-    let mut bucket = normalized.join(" ");
+    let mut bucket = order_normalize(conditions, sensitive, " ");
     if important {
         bucket.push_str(" !");
     }

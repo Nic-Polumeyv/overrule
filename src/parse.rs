@@ -74,26 +74,38 @@ fn split_top_level(token: &str) -> Vec<&str> {
     parts
 }
 
-/// Order-normalize variants into a bucket key. Variants commute only within
-/// the stretch between order-sensitive ones: hover before a pseudo-element
-/// reaches a different box than hover after it. So each stretch sorts on its
-/// own and the order-sensitive variants pin the boundaries.
-pub fn bucket_of<S: AsRef<str>>(variants: &[S], important: bool) -> String {
+/// Sort elements that commute, keep the ones that do not where they are.
+/// Elements commute only within the stretch between order-sensitive ones, so
+/// each stretch sorts on its own and the order-sensitive elements pin the
+/// boundaries. What counts as order-sensitive is the caller's call: variants
+/// here, compiled conditions in [`crate::css`].
+pub fn order_normalize<S: AsRef<str>>(
+    elements: &[S],
+    order_sensitive: impl Fn(&str) -> bool,
+    separator: &str,
+) -> String {
     let mut normalized: Vec<&str> = Vec::new();
     let mut segment: Vec<&str> = Vec::new();
-    for variant in variants {
-        let variant = variant.as_ref();
-        if is_order_sensitive(variant) {
+    for element in elements {
+        let element = element.as_ref();
+        if order_sensitive(element) {
             segment.sort_unstable();
             normalized.append(&mut segment);
-            normalized.push(variant);
+            normalized.push(element);
         } else {
-            segment.push(variant);
+            segment.push(element);
         }
     }
     segment.sort_unstable();
     normalized.append(&mut segment);
-    let mut bucket = normalized.join(":");
+    normalized.join(separator)
+}
+
+/// Order-normalize variants into a bucket key. Variants commute only within
+/// the stretch between order-sensitive ones: hover before a pseudo-element
+/// reaches a different box than hover after it.
+pub fn bucket_of<S: AsRef<str>>(variants: &[S], important: bool) -> String {
+    let mut bucket = order_normalize(variants, is_order_sensitive, ":");
     if important {
         bucket.push('!');
     }
