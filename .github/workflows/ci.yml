@@ -27,4 +27,4 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
       - run: bun test
-      - run: bunx tsc -p tsconfig.test.json
+      - run: bunx tsc -p tsconfig.json

@@ -8,8 +8,8 @@
 		"checkJs": true,
 		"noEmit": true,
 		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true
+		"forceConsistentCasingInFileNames": true,
+		"types": ["bun"]
 	},
-	"include": ["runtime"],
-	"exclude": ["runtime/**/*.test.ts"]
+	"include": ["runtime", "tests/runtime"]
 }

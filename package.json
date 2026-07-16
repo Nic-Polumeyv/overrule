@@ -3,7 +3,7 @@
 	"private": true,
 	"description": "dev-only: the cross end-to-end test and the --css oracle resolve tailwindcss from here when the scanned project has none",
 	"scripts": {
-		"check:runtime": "tsc -p tsconfig.runtime.json && tsc -p tsconfig.test.json",
+		"check:runtime": "tsc -p tsconfig.json",
 		"test": "bun test"
 	},
 	"devDependencies": {
