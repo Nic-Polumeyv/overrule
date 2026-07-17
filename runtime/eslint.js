@@ -20,7 +20,12 @@ import { createMapOracle } from './map-oracle.js';
  * @typedef {{ options: any[], cwd?: string, sourceCode: any, report: (descriptor: any) => void }} RuleContext
  */
 
-const DEFAULT_FUNCTIONS = ['cn', 'clsx', 'join', 'cva', 'tv', 'declareVariants'];
+// Mirrors CALL_RE in src/scan.rs, same names, same order; the two lists
+// drifting apart is the exact bug class this tool exists to catch. Member
+// calls match by property name because CALL_RE's \b matches `ui.cn(` too.
+// Generic names like a stray `arr.join(', ')` are harmless on both sides:
+// the oracle never drops tokens the map has no evidence about.
+const DEFAULT_FUNCTIONS = ['cn', 'cx', 'clsx', 'tv', 'cva', 'join', 'declareVariants'];
 const DEFAULT_ATTRIBUTES = ['class', 'className'];
 
 // Oracle per resolved map path, invalidated by mtime: editor ESLint servers

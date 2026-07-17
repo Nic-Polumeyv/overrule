@@ -16,7 +16,8 @@ export type NoConflictsOptions = {
 	map: string | ConflictMap;
 	/**
 	 * Call expressions whose string arguments are judged, by callee name.
-	 * Default: cn, clsx, join, cva, tv, declareVariants.
+	 * The default mirrors the CLI scanner: cn, cx, clsx, tv, cva, join,
+	 * declareVariants.
 	 */
 	functions?: readonly string[];
 	/** JSX attributes whose values are judged. Default: class, className. */

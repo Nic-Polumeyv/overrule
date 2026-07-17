@@ -57,7 +57,7 @@ With no options the merger is platform-neutral: a merged `style` stays an object
 
 ## ESLint
 
-`overrule/eslint` is a flat-config plugin with one rule, `no-conflicts`. It judges static class strings in JSX class attributes and in calls to `cn`, `clsx`, `join`, `cva`, `tv`, and `declareVariants`, using the map `overrule map` emits, so the editor judges with the same compiled stylesheet as CI. The fix removes the losing tokens, the same rewrite `fix` performs.
+`overrule/eslint` is a flat-config plugin with one rule, `no-conflicts`. It judges static class strings in JSX class attributes and in calls to the same function names the CLI scanner harvests (`cn`, `cx`, `clsx`, `tv`, `cva`, `join`, `declareVariants`), using the map `overrule map` emits, so the editor judges with the same compiled stylesheet as CI. The fix removes the losing tokens, the same rewrite `fix` performs.
 
 ```js
 // eslint.config.js

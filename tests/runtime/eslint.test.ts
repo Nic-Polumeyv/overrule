@@ -117,6 +117,14 @@ test('a member call judges by property name', () => {
 	expect(lint('const c = ui.cn("p-2 p-4");')).toHaveLength(1);
 });
 
+test('the default function list mirrors the CLI scanner, cx included', () => {
+	expect(lint('const c = cx("p-2 p-4");')).toHaveLength(1);
+});
+
+test('a generic member join stays quiet: separators are unknown tokens', () => {
+	expect(lint('const s = parts.join(", ");')).toEqual([]);
+});
+
 test('a static template literal reports but is not rewritten', () => {
 	const code = 'const c = cn(`p-2 p-4`);';
 	expect(lint(code)).toHaveLength(1);
