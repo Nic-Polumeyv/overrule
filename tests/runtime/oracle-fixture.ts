@@ -1,8 +1,9 @@
-import { createMapOracle } from '../../runtime/map-oracle.js';
+import { createMapOracle, type ConflictMap } from '../../runtime/map-oracle.js';
 
 // A hand-written stylesheet map stands in for a generated one: enough tokens
 // for every contract in these tests to contest realistically, nothing else.
-export const mapOracle = createMapOracle({
+// The raw map is exported too; the eslint suite feeds it through rule options.
+export const conflictMap: ConflictMap = {
 	version: 1,
 	covers: {},
 	tokens: {
@@ -29,4 +30,6 @@ export const mapOracle = createMapOracle({
 		'items-center': [{ bucket: '', props: ['align-items'] }],
 		'gap-2': [{ bucket: '', props: ['gap'] }],
 	},
-});
+};
+
+export const mapOracle = createMapOracle(conflictMap);

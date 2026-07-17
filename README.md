@@ -57,7 +57,7 @@ With no options the merger is platform-neutral: a merged `style` stays an object
 
 ## ESLint
 
-`overrule/eslint` is a flat-config plugin with one rule, `no-conflicts`. It judges static class strings in JSX class attributes and in calls to the same function names the CLI scanner harvests (`cn`, `cx`, `clsx`, `tv`, `cva`, `join`, `declareVariants`), using the map `overrule map` emits, so the editor judges with the same compiled stylesheet as CI. The fix removes the losing tokens, the same rewrite `fix` performs.
+`overrule/eslint` is a flat-config plugin with one rule, `no-conflicts`. It judges static class strings in JSX class attributes and in calls to the same function names the CLI scanner harvests (`cn`, `cx`, `clsx`, `tv`, `cva`, `join`, `declareVariants`), using the map `overrule map` emits, so the editor judges with the same compiled stylesheet as CI. The fix is the same rewrite `fix` performs: losing tokens removed, exact duplicates collapsed.
 
 ```js
 // eslint.config.js
@@ -72,7 +72,7 @@ export default [
 ];
 ```
 
-`functions` and `attributes` options override the defaults. An all-static call is judged as the joined string, so cross-argument losers surface too; anything dynamic is judged literal by literal, branch by branch. Svelte and Vue templates are the CLI's job; the plugin covers what ESLint parses.
+`functions` and `attributes` options override the defaults; spread `DEFAULT_FUNCTIONS` to extend the list instead of replacing it. Every static literal is judged alone, branch by branch, the CLI scanner's model exactly; cross-argument conflicts are the runtime guard's domain. Svelte and Vue templates are the CLI's job; the plugin covers what ESLint parses.
 
 ## Migrating
 
