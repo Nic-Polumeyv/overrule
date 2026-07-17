@@ -55,6 +55,29 @@ const props = mergeProps({ class: 'px-2', onclick: open }, { class: 'px-4', oncl
 
 With no options the merger is platform-neutral: a merged `style` stays an object, no attribute is dropped, functions are chained. Options opt into framework idioms: `styleAs: 'string'` serializes `style` to a string, `dropFalseAttrs` removes named boolean attrs when they merge to false, and `isEventHandler` marks which same-named functions compose with preventDefault (the rest chain). Framework-specific policy — the Svelte/bits-ui combination, say — is the consumer's to assemble from these options; overrule ships only the engine. The primitives ship too: `composeEventHandlers`, `chain`, `mergeStyles`, `styleToObject`, `styleToString`. Nothing rides along as a dependency, because the CSS parse and serialize are inline.
 
+## ESLint
+
+`overrule/eslint` is a flat-config plugin with one rule, `no-conflicts`. It judges static class strings in JSX class attributes and in calls to `cn`, `clsx`, `join`, `cva`, `tv`, and `declareVariants`, using the map `overrule map` emits, so the editor judges with the same compiled stylesheet as CI. The fix removes the losing tokens, the same rewrite `fix` performs.
+
+```js
+// eslint.config.js
+import overrule from 'overrule/eslint';
+
+export default [
+	{
+		files: ['**/*.{jsx,tsx}'],
+		plugins: { overrule },
+		rules: { 'overrule/no-conflicts': ['warn', { map: './conflicts.json' }] },
+	},
+];
+```
+
+`functions` and `attributes` options override the defaults. An all-static call is judged as the joined string, so cross-argument losers surface too; anything dynamic is judged literal by literal, branch by branch. Svelte and Vue templates are the CLI's job; the plugin covers what ESLint parses.
+
+## Migrating
+
+Coming off runtime tailwind-merge in an existing codebase is a fixed sequence: checks first, flip last, because merge-semantics variants and callers become stylesheet-order coin flips the moment the merge comes off. [docs/migrating.md](docs/migrating.md) walks the order that took a seven-app monorepo to zero runtime merging with zero visual changes.
+
 ## What moved, what stayed
 
 | v0.3.1 | now | notes |
@@ -69,7 +92,7 @@ With no options the merger is platform-neutral: a merged `style` stays an object
 
 ## The two design calls
 
-**tailwind-fuse instead of tailwind-merge.** The tables side needs a merge engine and tailwind-merge is JavaScript. tailwind-fuse is the Rust port of it, so it slots into the same seam. But its tables lag, so the oracle carries a patch layer, each verdict taken from a tailwind-merge 3.6 run: ring widths through arbitrary values (the shadcn focus ring), `outline-hidden`, v4 gradient, size and position backgrounds, `font-stretch` and non-weight font families, `text-shadow`, `text-base/7`, and the overflow-x/y lump. It also only parses the v3 leading `!`, so the oracle rewrites `font-normal!` to `!font-normal` before judging to keep important and normal classes out of each other's way. What remains is false negatives: groups fuse has never heard of (`mask-*`, `field-sizing-*`) pass silently. It is the same lesson this tool is built on: name tables drift, and `cross` makes the drift visible. Judge with `--css` in CI; the bare tables are the quick local pass.
+**tailwind-fuse instead of tailwind-merge.** The tables side needs a merge engine and tailwind-merge is JavaScript. tailwind-fuse is the Rust port of it, so it slots into the same seam. But its tables lag, so the oracle carries a patch layer, each verdict taken from a tailwind-merge 3.6 run: ring widths through arbitrary values (the shadcn focus ring), `outline-hidden`, v4 gradient, size and position backgrounds, `font-stretch` and non-weight font families, `text-shadow`, `text-base/7`, and the overflow-x/y lump. It also only parses the v3 leading `!`, so the oracle rewrites `font-normal!` to `!font-normal` before judging to keep important and normal classes out of each other's way. What remains is false negatives: groups fuse has never heard of (`mask-*`, `field-sizing-*`) pass silently. fuse itself has not moved since before Tailwind v4 shipped, so the patch layer is the living half and grows with every misread `cross` catches. It is the same lesson this tool is built on: name tables drift, and `cross` makes the drift visible. Judge with `--css` in CI; the bare tables are the quick local pass.
 
 **The stylesheet oracle still compiles with Tailwind itself.** Reimplementing the compiler in Rust would recreate exactly the drift this tool exists to catch. So the judging logic (css.rs) is a pure port and the compiling is one batched `node` call: collect every token the scan will see, hand the batch to bridge/dump-asts.mjs, judge the ASTs in Rust. One subprocess per run, ~100ms. The script resolves @tailwindcss/node from the scanned project first, hopping through @tailwindcss/vite and friends for isolated installs like bun and pnpm, then from the invocation directory as the escape hatch for library packages that rightly declare no tailwind at all.
 
