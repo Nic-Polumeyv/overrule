@@ -1,0 +1,8 @@
+{
+	"version": 1,
+	"covers": {},
+	"tokens": {
+		"p-2": [{ "bucket": "", "props": ["padding"] }],
+		"p-4": [{ "bucket": "", "props": ["padding"] }]
+	}
+}

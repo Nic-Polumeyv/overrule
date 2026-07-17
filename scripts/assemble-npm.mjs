@@ -105,6 +105,7 @@ writeFileSync(
 				'./map': { types: './runtime/map-oracle.d.ts', default: './runtime/map-oracle.js' },
 				'./test': { types: './runtime/test.d.ts', default: './runtime/test.js' },
 				'./props': { types: './runtime/props.d.ts', default: './runtime/props.js' },
+				'./eslint': { types: './runtime/eslint.d.ts', default: './runtime/eslint.js' },
 			},
 			optionalDependencies: Object.fromEntries(Object.values(TARGETS).map((p) => [p.name, version])),
 			files: ['bin', 'runtime'],
