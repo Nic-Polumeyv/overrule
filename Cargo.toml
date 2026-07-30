@@ -7,7 +7,6 @@ repository = "https://github.com/Nic-Polumeyv/overrule"
 license = "MIT"
 
 [dependencies]
-clap = { version = "4.6.1", features = ["derive"] }
 mimalloc = "0.1.52"
 rayon = "1.12.0"
 rustc-hash = "2.1.2"

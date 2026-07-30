@@ -267,9 +267,9 @@ fn stale_ack_entries_are_listed_in_json_matched_ones_are_not() {
 
 #[test]
 fn ack_outside_cross_is_an_error() {
-    // clap rejects the flag at parse time: exit 2 and its own wording, where
-    // the npm CLI exits 1 with "--ack only means something to cross". Same
-    // contract, different reporter.
+    // The parser rejects the flag: exit 2 and its own wording, where the npm
+    // CLI exits 1 with "--ack only means something to cross". Same contract,
+    // different reporter.
     let (code, _, err) = run(
         &["check", "--ack", "whatever.json", "tests/fixtures"],
         &root(),
@@ -333,10 +333,86 @@ fn map_emits_a_versioned_deterministic_conflict_map() {
 }
 
 #[test]
-fn map_without_css_is_a_clap_error() {
+fn map_without_css_is_a_parse_error() {
     let (code, _, err) = run(&["map", "tests/fixtures"], &root(), false);
-    assert_ne!(code, 0);
+    assert_eq!(code, 2);
     assert!(err.contains("--css"), "stderr: {err}");
+}
+
+// ---- the parse surface clap used to provide, pinned byte-for-byte ----
+
+#[test]
+fn bare_and_help_print_usage_and_exit_0() {
+    let (code, out, _) = run(&[], &root(), false);
+    assert_eq!(code, 0);
+    assert!(out.starts_with("catch Tailwind class conflicts before they ship"));
+    assert!(out.contains("Usage: overrule [COMMAND]"), "out: {out}");
+    let (_, help_out, _) = run(&["--help"], &root(), false);
+    assert_eq!(out, help_out);
+}
+
+#[test]
+fn version_prints_name_and_cargo_version() {
+    let (code, out, _) = run(&["--version"], &root(), false);
+    assert_eq!(code, 0);
+    assert_eq!(out, format!("overrule {}\n", env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn a_typo_gets_a_did_you_mean_tip_and_exit_2() {
+    let (code, _, err) = run(&["chekc"], &root(), false);
+    assert_eq!(code, 2);
+    assert_eq!(
+        err,
+        "error: unrecognized subcommand 'chekc'\n\n  tip: a similar subcommand exists: 'check'\n\nUsage: overrule [COMMAND]\n\nFor more information, try '--help'.\n"
+    );
+}
+
+#[test]
+fn an_unknown_flag_names_itself_and_suggests_the_near_miss() {
+    let (code, _, err) = run(&["check", "--jsn"], &root(), false);
+    assert_eq!(code, 2);
+    assert!(
+        err.contains("unexpected argument '--jsn' found"),
+        "stderr: {err}"
+    );
+    assert!(
+        err.contains("a similar argument exists: '--json'"),
+        "stderr: {err}"
+    );
+    assert!(
+        err.contains("Usage: overrule check --json [PATHS]..."),
+        "stderr: {err}"
+    );
+}
+
+#[test]
+fn a_repeated_flag_is_rejected() {
+    let (code, _, err) = run(&["check", "--json", "--json"], &root(), false);
+    assert_eq!(code, 2);
+    assert!(
+        err.contains("the argument '--json' cannot be used multiple times"),
+        "stderr: {err}"
+    );
+}
+
+#[test]
+fn a_value_flag_without_a_value_is_rejected_without_usage() {
+    let (code, _, err) = run(&["check", "--css"], &root(), false);
+    assert_eq!(code, 2);
+    assert_eq!(
+        err,
+        "error: a value is required for '--css <file>' but none was supplied\n\nFor more information, try '--help'.\n"
+    );
+}
+
+#[test]
+fn double_dash_passes_flag_shaped_positionals_through() {
+    // The literal is judged, not read as a flag: it reaches the oracle and
+    // loses its negative margin to mt-4.
+    let (code, out, _) = run(&["judge", "--", "-mt-2 mt-4"], &root(), false);
+    assert_eq!(code, 1);
+    assert!(out.contains("drops  -mt-2"), "out: {out}");
 }
 
 #[test]
