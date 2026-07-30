@@ -3,7 +3,7 @@
 //! trait exists so the stylesheet-derived oracle can replace the name-based
 //! tables, same seam as the npm package.
 
-use rustc_hash::FxHashSet;
+use crate::hash::FxHashSet;
 
 /// Decides which tokens in a class string lose to a later token.
 pub trait Oracle {
@@ -590,14 +590,14 @@ fn judge(classes: &str) -> Vec<String> {
 /// which parallel scan threads share without contention.
 pub struct Memo<O> {
     inner: O,
-    cache: std::sync::RwLock<rustc_hash::FxHashMap<String, Vec<String>>>,
+    cache: std::sync::RwLock<crate::hash::FxHashMap<String, Vec<String>>>,
 }
 
 impl<O: Oracle> Memo<O> {
     pub fn new(inner: O) -> Self {
         Self {
             inner,
-            cache: std::sync::RwLock::new(rustc_hash::FxHashMap::default()),
+            cache: std::sync::RwLock::new(crate::hash::FxHashMap::default()),
         }
     }
 }
