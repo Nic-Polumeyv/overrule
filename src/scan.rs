@@ -119,8 +119,9 @@ pub fn without_losers(literal: &str, dropped: &[String]) -> String {
 // order; the eslint tests parse this list out of the source.
 const CALL_FUNCTIONS: &[&str] = &["cn", "cx", "clsx", "tv", "cva", "join", "declareVariants"];
 
-// \w minus exotica the regexes counted (combining marks, superscript digits);
-// no source puts those against an identifier.
+// Close to \w but not it: drops combining marks, connector punctuation past
+// '_', and join controls; admits superscript digits. Exact parity needs the
+// Unicode tables the regex crate was dropped for.
 fn is_word_char(c: char) -> bool {
     c == '_' || c.is_alphanumeric()
 }
@@ -132,10 +133,11 @@ fn boundary_before(src: &str, pos: usize) -> bool {
     !src[..pos].chars().next_back().is_some_and(is_word_char)
 }
 
-// Content excludes BOTH quote types on purpose, exactly like the npm
-// scanner: a Svelte interpolation `{cond ? 'a' : 'b'}` inside a double-quoted
-// attribute always carries the other quote, so this exclusion is what keeps
-// branch-split literals from being judged as one string.
+/// Quoted `class`/`className` attribute values. Content excludes BOTH quote
+/// types on purpose, exactly like the npm scanner: a Svelte interpolation
+/// `{cond ? 'a' : 'b'}` inside a double-quoted attribute always carries the
+/// other quote, so this exclusion is what keeps branch-split literals from
+/// being judged as one string.
 fn attr_literals(src: &str) -> Vec<Literal<'_>> {
     let bytes = src.as_bytes();
     let mut literals = Vec::new();
@@ -147,7 +149,7 @@ fn attr_literals(src: &str) -> Vec<Literal<'_>> {
             continue;
         }
         let mut i = at + 5;
-        if bytes[i..].starts_with(b"Name") {
+        if src[i..].starts_with("Name") {
             i += 4;
         }
         if bytes.get(i) != Some(&b'=') {
@@ -177,8 +179,10 @@ fn attr_literals(src: &str) -> Vec<Literal<'_>> {
 /// Open-paren offsets of watched calls: a listed name on a word boundary,
 /// optional whitespace, then `(`.
 fn call_open_parens(src: &str) -> Vec<usize> {
-    // Driven off `(` rather than the names: parens are rare next to c/t/j/d
-    // bytes, and char search gets the fast memchr path in std.
+    // Driven off `(`: one char search per paren plus a backwards name check,
+    // the best shape without a prefilter engine. The regex it replaced was
+    // still ~2x faster on minified JS; next to read and judge time that
+    // never shows.
     let mut parens = Vec::new();
     let mut from = 0;
     while let Some(offset) = src[from..].find('(') {
@@ -511,6 +515,8 @@ mod tests {
         );
         assert_eq!(extracted("<div class=\"p-2 p-4"), Vec::<String>::new());
         assert_eq!(extracted("<div class=\"p-2 p-4'>"), Vec::<String>::new());
+        assert_eq!(extracted("<div class=p-2 p-4>"), Vec::<String>::new());
+        assert_eq!(extracted("<div class="), Vec::<String>::new());
         assert_eq!(extracted("<div class=\"\">"), Vec::<String>::new());
         assert_eq!(extracted("<div class=\"p-2\np-4\">"), ["p-2\np-4"]);
         assert_eq!(
@@ -526,6 +532,9 @@ mod tests {
         assert_eq!(extracted("_cn(\"p-2 p-4\")"), Vec::<String>::new());
         assert_eq!(extracted("1cn(\"p-2 p-4\")"), Vec::<String>::new());
         assert_eq!(extracted("écn(\"p-2 p-4\")"), Vec::<String>::new());
+        // NFD é ends in a combining mark, a word char to the old regex \b but
+        // not to the vendored boundary; this pins the known divergence.
+        assert_eq!(extracted("e\u{301}cn(\"p-2 p-4\")"), ["p-2 p-4"]);
         // $ and . are not identifier chars to the boundary check.
         assert_eq!(extracted("$cn(\"p-2 p-4\")"), ["p-2 p-4"]);
         assert_eq!(extracted("ui.cn(\"p-2 p-4\")"), ["p-2 p-4"]);

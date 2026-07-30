@@ -21,11 +21,11 @@ import { createMapOracle } from './map-oracle.js';
  */
 
 /**
- * Mirrors CALL_RE in src/scan.rs, same names, same order; a test greps the
- * Rust source and fails if the two lists drift. Member calls match by
- * property name because CALL_RE's \b matches `ui.cn(` too. Generic names like
- * a stray `arr.join(', ')` are harmless on both sides: the oracle never drops
- * tokens the map has no evidence about.
+ * Mirrors CALL_FUNCTIONS in src/scan.rs, same names, same order; a test greps
+ * the Rust source and fails if the two lists drift. Member calls match by
+ * property name because the scanner's word boundary takes `ui.cn(` too.
+ * Generic names like a stray `arr.join(', ')` are harmless on both sides: the
+ * oracle never drops tokens the map has no evidence about.
  */
 export const DEFAULT_FUNCTIONS = ['cn', 'cx', 'clsx', 'tv', 'cva', 'join', 'declareVariants'];
 const DEFAULT_ATTRIBUTES = ['class', 'className'];
