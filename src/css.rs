@@ -18,30 +18,52 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::LazyLock;
 
-use serde::Deserialize;
-
 use crate::oracle::Oracle;
 use crate::parse::order_normalize;
 
 /// One node of Tailwind's compiled AST, the shape candidatesToAst returns
 /// (available since tailwindcss 4.2). Unknown fields are ignored.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct AstNode {
     pub kind: String,
-    #[serde(default)]
     pub selector: Option<String>,
-    #[serde(default)]
     pub name: Option<String>,
-    #[serde(default)]
     pub params: Option<String>,
-    #[serde(default)]
     pub property: Option<String>,
-    #[serde(default)]
     pub value: Option<String>,
-    #[serde(default)]
     pub important: Option<bool>,
-    #[serde(default)]
     pub nodes: Option<Vec<AstNode>>,
+}
+
+impl AstNode {
+    /// One node out of the bridge's JSON: `kind` is required, every other
+    /// field optional, unknown fields ignored.
+    pub fn from_value(value: &serde_json::Value) -> Result<AstNode, String> {
+        let kind = value["kind"]
+            .as_str()
+            .ok_or_else(|| "an AST node is missing its kind".to_string())?
+            .to_string();
+        let text = |key: &str| value[key].as_str().map(str::to_string);
+        let nodes = match value["nodes"].as_array() {
+            Some(nodes) => Some(
+                nodes
+                    .iter()
+                    .map(AstNode::from_value)
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            None => None,
+        };
+        Ok(AstNode {
+            kind,
+            selector: text("selector"),
+            name: text("name"),
+            params: text("params"),
+            property: text("property"),
+            value: text("value"),
+            important: value["important"].as_bool(),
+            nodes,
+        })
+    }
 }
 
 /// A flattened declaration. Declarations only contest within a bucket.
@@ -561,7 +583,21 @@ mod tests {
     use super::*;
 
     fn compiled(fixture: &str) -> CompiledCandidates {
-        let asts: HashMap<String, Vec<AstNode>> = serde_json::from_str(fixture).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(fixture).unwrap();
+        let asts: Vec<(String, Vec<AstNode>)> = parsed
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(token, nodes)| {
+                let nodes = nodes
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|node| AstNode::from_value(node).unwrap())
+                    .collect();
+                (token.clone(), nodes)
+            })
+            .collect();
         CompiledCandidates::from_asts(asts)
     }
 

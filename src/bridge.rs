@@ -89,7 +89,24 @@ pub fn compile_candidates(
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
-    let asts: Vec<Vec<AstNode>> = serde_json::from_slice(&output.stdout)
+    let answer: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .map_err(|e| format!("could not read Tailwind's answer: {e}"))?;
+    let asts: Vec<Vec<AstNode>> = answer
+        .as_array()
+        .ok_or_else(|| "expected a list of ASTs".to_string())
+        .and_then(|lists| {
+            lists
+                .iter()
+                .map(|nodes| {
+                    nodes
+                        .as_array()
+                        .ok_or_else(|| "expected a node list".to_string())?
+                        .iter()
+                        .map(AstNode::from_value)
+                        .collect()
+                })
+                .collect()
+        })
         .map_err(|e| format!("could not read Tailwind's answer: {e}"))?;
     // zip would silently truncate and misread absent tokens as typos.
     if asts.len() != tokens.len() {
