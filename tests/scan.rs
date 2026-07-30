@@ -83,7 +83,7 @@ fn nested_calls_report_the_shared_literal_once() {
 #[test]
 fn overlapping_findings_rewrite_once_and_the_result_is_stable() {
     // A call string carrying a class='...' substring is found twice: the
-    // attribute regex takes the inner span, the call collector the whole
+    // attribute extractor takes the inner span, the call collector the whole
     // string. Splicing both would rewrite the outer against stale offsets.
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("nested.svelte");

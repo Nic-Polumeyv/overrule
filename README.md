@@ -123,7 +123,7 @@ The single-threaded delta is small because the merge engine dominates, not the l
 
 ## Porting notes worth remembering
 
-- The attr regex excludes BOTH quote types from the content on purpose. A Svelte interpolation `{cond ? 'a' : 'b'}` inside a double-quoted attribute always carries the other quote, so the exclusion is what keeps branch-split literals from being judged as one string. Relaxing it produced a false conflict across ternary branches within the hour.
+- The attr scanner excludes BOTH quote types from the content on purpose. A Svelte interpolation `{cond ? 'a' : 'b'}` inside a double-quoted attribute always carries the other quote, so the exclusion is what keeps branch-split literals from being judged as one string. Relaxing it produced a false conflict across ternary branches within the hour.
 - libuv sorts scandir results, Rust's read_dir does not. The walker sorts entries by name so findings come out in the npm CLI's order and outputs stay diffable.
 - Byte indexing is safe everywhere the scanner slices, because every delimiter it looks for is ASCII and an ASCII byte in UTF-8 is always a real character.
 - The Oracle trait takes &self, so the token collector in the CLI holds its set behind a Mutex. It was a RefCell until scan_paths went parallel; the compiler rejected it the same minute.
