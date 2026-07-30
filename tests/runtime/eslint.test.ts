@@ -128,11 +128,12 @@ test('a static template literal reports but is not rewritten', () => {
 
 // ---- parity with the CLI scanner ----
 
-test('DEFAULT_FUNCTIONS mirrors CALL_RE in src/scan.rs, same names, same order', () => {
+test('DEFAULT_FUNCTIONS mirrors CALL_FUNCTIONS in src/scan.rs, same names, same order', () => {
 	const rust = readFileSync(new URL('../../src/scan.rs', import.meta.url), 'utf8');
-	const alternation = rust.match(/\(\?:([a-zA-Z|]+)\)\\s\*\\\(/);
-	expect(alternation).not.toBeNull();
-	expect([...DEFAULT_FUNCTIONS]).toEqual(alternation![1].split('|'));
+	const list = rust.match(/const CALL_FUNCTIONS: &\[&str\] = &\[([^\]]+)\]/);
+	expect(list).not.toBeNull();
+	const names = [...list![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+	expect([...DEFAULT_FUNCTIONS]).toEqual(names);
 });
 
 // ---- options ----

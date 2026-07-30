@@ -9,9 +9,6 @@ use std::collections::HashMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
-
-use regex::Regex;
 
 use crate::oracle::Oracle;
 
@@ -118,14 +115,89 @@ pub fn without_losers(literal: &str, dropped: &[String]) -> String {
         .join(" ")
 }
 
-// Content excludes BOTH quote types on purpose, exactly like the npm
-// scanner: a Svelte interpolation `{cond ? 'a' : 'b'}` inside a double-quoted
-// attribute always carries the other quote, so this exclusion is what keeps
-// branch-split literals from being judged as one string.
-static ATTR_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"\bclass(?:Name)?=(?:"([^"']+)"|'([^"']+)')"#).unwrap());
-static CALL_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\b(?:cn|cx|clsx|tv|cva|join|declareVariants)\s*\(").unwrap());
+// Mirrored by DEFAULT_FUNCTIONS in runtime/eslint.js, same names, same
+// order; the eslint tests parse this list out of the source.
+const CALL_FUNCTIONS: &[&str] = &["cn", "cx", "clsx", "tv", "cva", "join", "declareVariants"];
+
+// Close to \w but not it: drops combining marks, connector punctuation past
+// '_', and join controls; admits superscript digits. Exact parity needs the
+// Unicode tables the regex crate was dropped for.
+fn is_word_char(c: char) -> bool {
+    c == '_' || c.is_alphanumeric()
+}
+
+/// The `\b` both scanners assert: `pos` does not sit right after an
+/// identifier char. Callers only pass offsets of matched ASCII bytes, so
+/// `pos` is always a char boundary.
+fn boundary_before(src: &str, pos: usize) -> bool {
+    !src[..pos].chars().next_back().is_some_and(is_word_char)
+}
+
+/// Quoted `class`/`className` attribute values. Content excludes BOTH quote
+/// types on purpose, exactly like the npm scanner: a Svelte interpolation
+/// `{cond ? 'a' : 'b'}` inside a double-quoted attribute always carries the
+/// other quote, so this exclusion is what keeps branch-split literals from
+/// being judged as one string.
+fn attr_literals(src: &str) -> Vec<Literal<'_>> {
+    let bytes = src.as_bytes();
+    let mut literals = Vec::new();
+    let mut from = 0;
+    while let Some(offset) = src[from..].find("class") {
+        let at = from + offset;
+        from = at + 1;
+        if !boundary_before(src, at) {
+            continue;
+        }
+        let mut i = at + 5;
+        if src[i..].starts_with("Name") {
+            i += 4;
+        }
+        if bytes.get(i) != Some(&b'=') {
+            continue;
+        }
+        let Some(&quote @ (b'"' | b'\'')) = bytes.get(i + 1) else {
+            continue;
+        };
+        let start = i + 2;
+        let mut end = start;
+        while end < bytes.len() && bytes[end] != b'"' && bytes[end] != b'\'' {
+            end += 1;
+        }
+        if end == start || bytes.get(end) != Some(&quote) {
+            continue;
+        }
+        literals.push(Literal {
+            content: &src[start..end],
+            start,
+            end,
+        });
+        from = end + 1;
+    }
+    literals
+}
+
+/// Open-paren offsets of watched calls: a listed name on a word boundary,
+/// optional whitespace, then `(`.
+fn call_open_parens(src: &str) -> Vec<usize> {
+    // Driven off `(`: one char search per paren plus a backwards name check,
+    // the best shape without a prefilter engine. The regex it replaced was
+    // still ~2x faster on minified JS; next to read and judge time that
+    // never shows.
+    let mut parens = Vec::new();
+    let mut from = 0;
+    while let Some(offset) = src[from..].find('(') {
+        let open = from + offset;
+        from = open + 1;
+        let head = src[..open].trim_end();
+        let watched = CALL_FUNCTIONS
+            .iter()
+            .any(|name| head.ends_with(name) && boundary_before(src, head.len() - name.len()));
+        if watched {
+            parens.push(open);
+        }
+    }
+    parens
+}
 
 /// Collect string literals inside a call's balanced parens, at any nesting
 /// depth. Byte indices are safe: every delimiter is ASCII and an ASCII byte in
@@ -185,21 +257,9 @@ fn literals_in_call(src: &str, open_paren: usize) -> Vec<Literal<'_>> {
 /// happens once per file no matter how many oracles judge the result; spans
 /// instead of borrows let [`SourceFile`] own the source they point into.
 fn candidate_spans(src: &str) -> Vec<(usize, usize)> {
-    let mut literals: Vec<Literal> = Vec::new();
-
-    for cap in ATTR_RE.captures_iter(src) {
-        let m = cap
-            .get(1)
-            .or_else(|| cap.get(2))
-            .expect("one alternative matched");
-        literals.push(Literal {
-            content: m.as_str(),
-            start: m.start(),
-            end: m.end(),
-        });
-    }
-    for m in CALL_RE.find_iter(src) {
-        literals.extend(literals_in_call(src, m.end() - 1));
+    let mut literals = attr_literals(src);
+    for open in call_open_parens(src) {
+        literals.extend(literals_in_call(src, open));
     }
 
     let mut seen = FxHashSet::default();
@@ -332,7 +392,7 @@ pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
         let mut src = fs::read_to_string(file)?;
         conflicts.sort_by_key(|conflict| std::cmp::Reverse(conflict.start));
         // Ranges can nest: a call string carrying a class='...' substring is
-        // reported by both regexes. Rewriting the outer after the inner would
+        // reported by both extractors. Rewriting the outer after the inner would
         // splice against stale offsets, so overlaps are skipped and the next
         // fix run picks up whatever the survivor left behind.
         let mut last_start = usize::MAX;
@@ -419,11 +479,84 @@ mod tests {
         assert_eq!(findings[1].fixed, "c d");
     }
 
+    fn every(classes: &str) -> Vec<String> {
+        classes.split_whitespace().map(str::to_string).collect()
+    }
+
+    /// Literal contents the scanner extracts, in report order.
+    fn extracted(src: &str) -> Vec<String> {
+        scan_source(src, &every)
+            .into_iter()
+            .map(|conflict| conflict.literal)
+            .collect()
+    }
+
+    #[test]
+    fn attribute_names_match_whole_words_and_exact_spelling() {
+        assert_eq!(
+            extracted("<div subclass=\"p-2 p-4\">"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            extracted("<div classNamee=\"p-2 p-4\">"),
+            Vec::<String>::new()
+        );
+        assert_eq!(extracted("<div class = \"p-2 p-4\">"), Vec::<String>::new());
+        assert_eq!(extracted("<div className='p-2 p-4'>"), ["p-2 p-4"]);
+        // A hyphen is not an identifier char, so prefixed attributes match.
+        assert_eq!(extracted("<div data-class=\"p-2 p-4\">"), ["p-2 p-4"]);
+    }
+
+    #[test]
+    fn attribute_values_need_a_matched_quote_pair_without_the_other_quote() {
+        assert_eq!(
+            extracted("<div class=\"p-2 'x' p-4\">"),
+            Vec::<String>::new()
+        );
+        assert_eq!(extracted("<div class=\"p-2 p-4"), Vec::<String>::new());
+        assert_eq!(extracted("<div class=\"p-2 p-4'>"), Vec::<String>::new());
+        assert_eq!(extracted("<div class=p-2 p-4>"), Vec::<String>::new());
+        assert_eq!(extracted("<div class="), Vec::<String>::new());
+        assert_eq!(extracted("<div class=\"\">"), Vec::<String>::new());
+        assert_eq!(extracted("<div class=\"p-2\np-4\">"), ["p-2\np-4"]);
+        assert_eq!(
+            extracted("<div class=\"p-2 p-4\" class='m-1 m-2'>"),
+            ["p-2 p-4", "m-1 m-2"]
+        );
+    }
+
+    #[test]
+    fn call_names_match_whole_words_only() {
+        assert_eq!(extracted("cnx(\"p-2 p-4\")"), Vec::<String>::new());
+        assert_eq!(extracted("xcn(\"p-2 p-4\")"), Vec::<String>::new());
+        assert_eq!(extracted("_cn(\"p-2 p-4\")"), Vec::<String>::new());
+        assert_eq!(extracted("1cn(\"p-2 p-4\")"), Vec::<String>::new());
+        assert_eq!(extracted("écn(\"p-2 p-4\")"), Vec::<String>::new());
+        // NFD é ends in a combining mark, a word char to the old regex \b but
+        // not to the vendored boundary; this pins the known divergence.
+        assert_eq!(extracted("e\u{301}cn(\"p-2 p-4\")"), ["p-2 p-4"]);
+        // $ and . are not identifier chars to the boundary check.
+        assert_eq!(extracted("$cn(\"p-2 p-4\")"), ["p-2 p-4"]);
+        assert_eq!(extracted("ui.cn(\"p-2 p-4\")"), ["p-2 p-4"]);
+    }
+
+    #[test]
+    fn whitespace_may_separate_the_call_name_from_its_paren() {
+        assert_eq!(extracted("cn (\"p-2 p-4\")"), ["p-2 p-4"]);
+        assert_eq!(extracted("cn\t\n(\"p-2 p-4\")"), ["p-2 p-4"]);
+        assert_eq!(extracted("cn?.(\"p-2 p-4\")"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn an_unterminated_call_still_yields_its_literals() {
+        assert_eq!(extracted("cn(\"p-2 p-4\""), ["p-2 p-4"]);
+    }
+
     #[test]
     fn declare_variants_config_objects_are_scanned_like_cva() {
         // declareVariants takes a config object like tv and cva. The collector
         // is depth-agnostic, so the nested variant strings are reached and the
-        // call name in the regex is the whole change.
+        // call name in the function list is the whole change.
         let findings = scan_source(
             "declareVariants({ variants: { size: { sm: 'a loser b' } } })",
             &fake,
