@@ -286,12 +286,7 @@ fn usage_unexpected_value(sub: &Sub, involved: Option<usize>, commit_order: &[us
     }
     if group_on {
         let members: Vec<String> = std::iter::once(sub.positional.to_string())
-            .chain(
-                sub.flags
-                    .iter()
-                    .filter(|flag| flag.grouped)
-                    .map(render),
-            )
+            .chain(sub.flags.iter().filter(|flag| flag.grouped).map(render))
             .collect();
         format!("overrule {}{} <{}>", sub.name, flags, members.join("|"))
     } else {
