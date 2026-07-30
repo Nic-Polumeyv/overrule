@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use crate::hash::{FxHashMap, FxHashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 

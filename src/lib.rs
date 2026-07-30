@@ -12,6 +12,7 @@
 
 pub mod bridge;
 pub mod css;
+mod hash;
 pub mod oracle;
 pub mod parse;
 pub mod scan;

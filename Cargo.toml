@@ -9,8 +9,7 @@ license = "MIT"
 [dependencies]
 mimalloc = "0.1.52"
 rayon = "1.12.0"
-rustc-hash = "2.1.2"
-serde = { version = "1.0.228", features = ["derive"] }
+serde = "1.0.228"
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
 tailwind_fuse = "0.3.2"
 
