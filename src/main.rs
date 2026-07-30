@@ -9,7 +9,6 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Mutex;
 
-use clap::{Args, CommandFactory, Parser, Subcommand};
 use serde_json::json;
 
 use overrule::bridge::compile_candidates;
@@ -24,90 +23,13 @@ use overrule::scan::{
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-#[derive(Parser)]
-#[command(
-    name = "overrule",
-    about = "catch Tailwind class conflicts before they ship",
-    version
-)]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Command>,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// report class strings with conflicting tokens (exit 1 if any)
-    Check(ScanArgs),
-    /// rewrite conflicting literals, losers removed
-    Fix(ScanArgs),
-    /// report every string where tailwind-fuse and your stylesheet disagree
-    Cross(CrossArgs),
-    /// judge class strings given as arguments or on stdin, one per line
-    Judge(JudgeArgs),
-    /// emit the stylesheet-derived conflict map for the JS dev-time oracle
-    Map(MapArgs),
-}
-
-#[derive(Args)]
-struct ScanArgs {
-    /// paths to scan; node_modules, dist, and friends are skipped
-    #[arg(default_value = ".")]
-    paths: Vec<PathBuf>,
-    /// judge with your compiled stylesheet instead of tailwind-fuse's tables.
-    /// Point it at the CSS entry that imports tailwindcss; your theme, custom
-    /// utilities, and prefix all count. Tokens that compile to nothing get
-    /// listed too. cross uses a bare tailwindcss import when --css is missing.
-    #[arg(long, value_name = "file")]
-    css: Option<PathBuf>,
-    /// machine output. Findings for check and fix, disagreements for cross.
-    #[arg(long)]
-    json: bool,
-}
-
-#[derive(Args)]
-struct CrossArgs {
-    #[command(flatten)]
-    scan: ScanArgs,
-    /// a snapshot from cross --json listing acknowledged disagreements;
-    /// anything not in it prints and exits 1. This is how cross becomes a CI
-    /// gate instead of an investigation.
-    #[arg(long, value_name = "file")]
-    ack: Option<PathBuf>,
-}
-
-#[derive(Args)]
-struct MapArgs {
-    /// paths to scan for class literals; node_modules, dist, and friends are skipped
-    #[arg(default_value = ".")]
-    paths: Vec<PathBuf>,
-    /// the CSS entry that imports tailwindcss. Required: the map exists to
-    /// carry your real stylesheet's verdicts, theme, prefix, and custom
-    /// utilities included.
-    #[arg(long, value_name = "file")]
-    css: PathBuf,
-    /// write the map here instead of stdout
-    #[arg(long, value_name = "file")]
-    out: Option<PathBuf>,
-}
-
-#[derive(Args)]
-struct JudgeArgs {
-    /// class strings to judge; with none given, one per line is read from stdin
-    literals: Vec<String>,
-    /// judge with your compiled stylesheet instead of tailwind-fuse's tables
-    #[arg(long, value_name = "file")]
-    css: Option<PathBuf>,
-    /// machine output: one verdict per literal, in input order
-    #[arg(long)]
-    json: bool,
-}
+mod cli;
+use cli::{Command, CrossArgs, JudgeArgs, MapArgs, ScanArgs};
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
-    let Some(command) = cli.command else {
+    let Some(command) = cli::parse() else {
         // Parity with the npm CLI: bare `overrule` prints usage and exits 0.
-        Cli::command().print_help().ok();
+        cli::print_help();
         return ExitCode::SUCCESS;
     };
     match command {
