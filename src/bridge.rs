@@ -76,16 +76,19 @@ pub fn compile_candidates(
         .map_err(|e| format!("could not run node, which the stylesheet oracle needs: {e}"))?;
 
     let payload = serde_json::to_vec(tokens).expect("a token list serializes");
-    child
-        .stdin
-        .take()
-        .expect("stdin is piped")
-        .write_all(&payload)
-        .map_err(|e| format!("could not hand the tokens to node: {e}"))?;
+    // Written from a thread while the parent reads: a payload past the pipe
+    // capacity would otherwise block against a child that errors before
+    // draining stdin, and the broken-pipe write would mask node's own
+    // diagnostic, which is the message worth showing.
+    let mut stdin = child.stdin.take().expect("stdin is piped");
+    let writer = std::thread::spawn(move || {
+        let _ = stdin.write_all(&payload);
+    });
 
     let output = child
         .wait_with_output()
         .map_err(|e| format!("node did not finish: {e}"))?;
+    writer.join().expect("the stdin writer does not panic");
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
