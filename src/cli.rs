@@ -261,8 +261,13 @@ fn usage_used(
 /// are still pending and invisible. A committed group member pulls in clap's
 /// implicit arg-group alternation, absorbing the involved flag; groupless
 /// flags (--ack) and --help render individually before it.
-fn usage_unexpected_value(sub: &Sub, involved: Option<usize>, commit_order: &[usize]) -> String {
-    let group_on = commit_order.iter().any(|&index| sub.flags[index].grouped);
+fn usage_unexpected_value(
+    sub: &Sub,
+    involved: Option<usize>,
+    commit_order: &[usize],
+    pending_value: bool,
+) -> String {
+    let group_on = pending_value || commit_order.iter().any(|&index| sub.flags[index].grouped);
     let mut flags = String::new();
     if !group_on {
         for (index, flag) in sub.flags.iter().enumerate() {
@@ -406,6 +411,15 @@ pub fn parse() -> Option<Command> {
             exit(0)
         }
         "-V" | "--version" => version(),
+        _ if name.starts_with("--help=") || name.starts_with("--version=") => {
+            let (flag, value) = name.split_once('=').expect("checked above");
+            fail(
+                &format!("unexpected value '{value}' for '{flag}' found; no more were expected"),
+                None,
+                Some(&format!("overrule {flag}")),
+                true,
+            )
+        }
         "help" => run_help(args),
         // `overrule --` alone is bare; `-- check` names a real subcommand
         // neutered by the separator, which clap calls out specifically.
@@ -545,10 +559,14 @@ fn run_help(mut args: impl Iterator<Item = OsString>) -> ! {
 
 /// A missing or empty value clap does not report at its own token: it fires
 /// at the next successfully processed flag (assignment, bool set, or help),
-/// or at the end of the line. Unknown-argument and unexpected-value errors
-/// bypass it; positionals never trigger it.
+/// at the next consumed positional for flag pendings, or at the end of the
+/// line. Unknown-argument and unexpected-value errors bypass it; a pending
+/// positional survives positionals, matching clap's resolve_pending guard.
 enum Pending {
     Flag(usize),
+    /// A space-form repeat: clap's duplicate error also waits for the next
+    /// recognized token, so an unknown argument after it wins.
+    Duplicate(usize),
     Positional,
     InvalidUtf8,
 }
@@ -556,6 +574,15 @@ enum Pending {
 fn fail_pending(sub: &Sub, pending: &Pending) -> ! {
     let subject = match pending {
         Pending::Flag(index) => render(&sub.flags[*index]),
+        Pending::Duplicate(index) => fail(
+            &format!(
+                "the argument '{}' cannot be used multiple times",
+                render(&sub.flags[*index])
+            ),
+            None,
+            Some(&usage(sub)),
+            true,
+        ),
         Pending::Positional => format!("[{}]...", sub.positional),
         Pending::InvalidUtf8 => fail(
             "invalid UTF-8 was detected in one or more arguments",
@@ -570,6 +597,18 @@ fn fail_pending(sub: &Sub, pending: &Pending) -> ! {
         None,
         true,
     )
+}
+
+/// clap's matcher still holds a pending or unresolved space-form value when
+/// an unexpected-value error prints; with a positional consumed too, that is
+/// what flips its usage into the arg-group alternation.
+fn pending_value(
+    positional_used: bool,
+    deferred: &Option<usize>,
+    pending: &Option<Pending>,
+) -> bool {
+    positional_used
+        && (deferred.is_some() || matches!(pending, Some(Pending::Flag(_) | Pending::Duplicate(_))))
 }
 
 fn flush_pending(sub: &Sub, pending: &Option<Pending>) {
@@ -611,7 +650,12 @@ fn parse_sub(sub: &Sub, args: impl Iterator<Item = OsString>) -> Command {
                                 "unexpected value '{value}' for '--help' found; no more were expected"
                             ),
                             None,
-                            Some(&usage_unexpected_value(sub, None, &commit_order)),
+                            Some(&usage_unexpected_value(
+                                sub,
+                                None,
+                                &commit_order,
+                                pending_value(positional_used, &deferred, &pending),
+                            )),
                             true,
                         );
                     }
@@ -664,7 +708,12 @@ fn parse_sub(sub: &Sub, args: impl Iterator<Item = OsString>) -> Command {
                                 "unexpected value '{value}' for '--{name}' found; no more were expected"
                             ),
                             None,
-                            Some(&usage_unexpected_value(sub, Some(index), &commit_order)),
+                            Some(&usage_unexpected_value(
+                                sub,
+                                Some(index),
+                                &commit_order,
+                                pending_value(positional_used, &deferred, &pending),
+                            )),
                             true,
                         );
                     }
@@ -732,15 +781,12 @@ fn parse_sub(sub: &Sub, args: impl Iterator<Item = OsString>) -> Command {
                         }
                         let value = args.next().expect("peeked above");
                         if assigned[index] {
-                            fail(
-                                &format!(
-                                    "the argument '{}' cannot be used multiple times",
-                                    render(flag)
-                                ),
-                                None,
-                                Some(&usage(sub)),
-                                true,
-                            );
+                            // clap's Set action removes the old value before
+                            // the conflict is raised, so the flag drops out
+                            // of later usage lines too.
+                            used_order.retain(|&used| used != index);
+                            pending.get_or_insert(Pending::Duplicate(index));
+                            continue;
                         }
                         mark_used(&mut used_order);
                         if value.is_empty() {
@@ -774,6 +820,9 @@ fn parse_sub(sub: &Sub, args: impl Iterator<Item = OsString>) -> Command {
             _ => {
                 if let Some(index) = deferred.take() {
                     commit_order.push(index);
+                }
+                if let Some(p @ (Pending::Flag(_) | Pending::Duplicate(_))) = &pending {
+                    fail_pending(sub, p);
                 }
                 positional_used = true;
                 if arg.is_empty() && !sub.strings {
