@@ -87,7 +87,7 @@ Coming off runtime tailwind-merge in an existing codebase is a fixed sequence: c
 | src/scan.ts | src/scan.rs | direct port, plus rayon: files are judged in parallel |
 | src/css.ts | src/css.rs | direct port of the judging logic, pure like the original |
 | src/css-node.ts | src/bridge.rs + bridge/dump-asts.mjs | see below |
-| src/cli.ts | src/main.rs | check, fix, cross, --css, --json, --ack, annotations |
+| src/cli.ts | src/main.rs + src/cli.rs | check, fix, cross, --css, --json, --ack, annotations |
 | join, guard, overrule/test | the npm package | they ship in consumers' dev bundles and stay JavaScript |
 
 ## The two design calls

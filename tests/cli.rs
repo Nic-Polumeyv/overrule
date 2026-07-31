@@ -457,3 +457,60 @@ fn judge_reads_stdin_and_returns_verdicts_in_input_order() {
     assert_eq!(verdicts[1]["fixed"], serde_json::json!("m-2"));
     assert_eq!(verdicts[2]["dropped"], serde_json::json!([]));
 }
+
+#[test]
+fn help_with_an_attached_value_is_an_unexpected_value_error() {
+    // The review found the top level routing --help=x to the unknown-argument
+    // fallback, suggesting the flag the user just typed.
+    let (code, _, err) = run(&["--help=x"], &root(), false);
+    assert_eq!(code, 2);
+    assert!(
+        err.starts_with("error: unexpected value 'x' for '--help' found; no more were expected"),
+        "stderr: {err}"
+    );
+    assert!(!err.contains("tip:"), "stderr: {err}");
+}
+
+#[test]
+fn an_unknown_argument_outranks_a_pending_duplicate_and_a_flushed_value() {
+    // Space-form duplicates defer like missing values; an unknown argument
+    // after either wins, and a consumed positional fires a pending value.
+    let (code, _, err) = run(
+        &["check", "--css", "a", "--css", "b", "--nope"],
+        &root(),
+        false,
+    );
+    assert_eq!(code, 2);
+    assert!(
+        err.contains("unexpected argument '--nope' found"),
+        "stderr: {err}"
+    );
+    assert!(
+        err.contains("Usage: overrule check [OPTIONS] [PATHS]..."),
+        "stderr: {err}"
+    );
+
+    let (code, _, err) = run(&["check", "--css", "", "p", "--nope"], &root(), false);
+    assert_eq!(code, 2);
+    assert!(
+        err.contains("a value is required for '--css <file>' but none was supplied"),
+        "stderr: {err}"
+    );
+}
+
+#[test]
+fn a_big_token_payload_still_surfaces_nodes_own_diagnostic() {
+    // Past the 64 KiB pipe capacity, the old single-threaded stdin write got
+    // a broken pipe when node failed before draining stdin, and that line
+    // replaced node's real message. The install hint must survive any size.
+    let mut src = String::from("<div class=\"");
+    for i in 0..4000 {
+        src.push_str(&format!("padding-token-{i:05}-x "));
+    }
+    src.push_str("\">x</div>\n");
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("big.html"), src).unwrap();
+    let (code, _, err) = run(&["check", "--css", "nope.css", "."], dir.path(), false);
+    assert_ne!(code, 0);
+    assert!(!err.contains("Broken pipe"), "stderr: {err}");
+}
