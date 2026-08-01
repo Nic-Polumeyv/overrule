@@ -1,6 +1,16 @@
 // Types live in map-oracle.d.ts, the hand-written public reference; this file
 // borrows them via import() so the two cannot use different shapes silently.
 
+const WHITESPACE = /\s+/;
+
+/**
+ * @param {string} classes
+ * @returns {string[]}
+ */
+function splitTokens(classes) {
+	return classes.split(WHITESPACE).filter((token) => token !== '');
+}
+
 /**
  * An oracle judged by a conflict map instead of tailwind-merge's name tables,
  * so the verdicts come from the stylesheet that actually ships. Replays the
@@ -24,21 +34,21 @@ export function createMapOracle(map) {
 		// Exact duplicates are one token: identical rules cannot beat themselves.
 		// A repeated token judges from its LAST occurrence, the instance the
 		// cascade actually reads, so "p-2 p-4 p-2" drops p-4.
-		const raw = classes.split(/\s+/).filter((token) => token !== '');
+		const raw = splitTokens(classes);
 		/** @type {Map<string, number>} */
 		const last = new Map();
 		for (let i = 0; i < raw.length; i++) last.set(raw[i], i);
-		const walk = [...last.keys()].sort(
-			(a, b) => /** @type {number} */ (last.get(a)) - /** @type {number} */ (last.get(b)),
-		);
 		// claimed: bucket -> properties won by kept tokens to the right.
 		/** @type {Map<string, Set<string>>} */
 		const claimed = new Map();
 		/** @type {Set<string>} */
 		const dropped = new Set();
 
-		for (let i = walk.length - 1; i >= 0; i--) {
-			const token = walk[i];
+		// Right to left over the raw string; the skip visits each unique token
+		// exactly once, at its last occurrence.
+		for (let i = raw.length - 1; i >= 0; i--) {
+			const token = raw[i];
+			if (last.get(token) !== i) continue;
 			// Object.hasOwn: the map is parsed JSON, so a token named "toString"
 			// must not resolve through Object.prototype.
 			const groups = Object.hasOwn(tokens, token) ? tokens[token] : undefined;
@@ -70,6 +80,9 @@ export function createMapOracle(map) {
 		}
 
 		// First-appearance order, not walk order: losers read in source order.
-		return [...last.keys()].filter((token) => dropped.has(token));
+		/** @type {string[]} */
+		const losers = [];
+		for (const token of last.keys()) if (dropped.has(token)) losers.push(token);
+		return losers;
 	};
 }

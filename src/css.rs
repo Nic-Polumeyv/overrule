@@ -15,15 +15,17 @@
 //! Tailwind itself and Tailwind lives in JavaScript. Reimplementing it here
 //! would recreate the drift this tool exists to catch.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::LazyLock;
 
+use crate::hash::{FxHashMap, FxHashSet};
 use crate::oracle::Oracle;
 use crate::parse::order_normalize;
 
 /// One node of Tailwind's compiled AST, the shape candidatesToAst returns
-/// (available since tailwindcss 4.2). Unknown fields are ignored.
-#[derive(Debug, Clone)]
+/// (available since tailwindcss 4.2). `kind` is required, every other field
+/// optional, unknown fields ignored.
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct AstNode {
     pub kind: String,
     pub selector: Option<String>,
@@ -33,37 +35,6 @@ pub struct AstNode {
     pub value: Option<String>,
     pub important: Option<bool>,
     pub nodes: Option<Vec<AstNode>>,
-}
-
-impl AstNode {
-    /// One node out of the bridge's JSON: `kind` is required, every other
-    /// field optional, unknown fields ignored.
-    pub fn from_value(value: &serde_json::Value) -> Result<AstNode, String> {
-        let kind = value["kind"]
-            .as_str()
-            .ok_or_else(|| "an AST node is missing its kind".to_string())?
-            .to_string();
-        let text = |key: &str| value[key].as_str().map(str::to_string);
-        let nodes = match value["nodes"].as_array() {
-            Some(nodes) => Some(
-                nodes
-                    .iter()
-                    .map(AstNode::from_value)
-                    .collect::<Result<Vec<_>, _>>()?,
-            ),
-            None => None,
-        };
-        Ok(AstNode {
-            kind,
-            selector: text("selector"),
-            name: text("name"),
-            params: text("params"),
-            property: text("property"),
-            value: text("value"),
-            important: value["important"].as_bool(),
-            nodes,
-        })
-    }
 }
 
 /// A flattened declaration. Declarations only contest within a bucket.
@@ -110,45 +81,37 @@ fn unescape(selector: &str) -> String {
     out
 }
 
-struct RawDecl {
-    conditions: Vec<String>,
-    property: String,
-    important: bool,
-}
-
-/// Flatten a candidate's AST into declarations tagged with their condition stack.
-fn collect(nodes: &[AstNode], conditions: &[String], candidate: &str, out: &mut Vec<RawDecl>) {
+/// Flatten a candidate's AST into declarations, each bucketed by the
+/// condition stack it sits under.
+fn collect(nodes: &[AstNode], conditions: &[String], candidate: &str, out: &mut Vec<Decl>) {
     for node in nodes {
         match (node.kind.as_str(), &node.property, &node.nodes) {
-            ("declaration", Some(property), _) => out.push(RawDecl {
-                conditions: conditions.to_vec(),
+            ("declaration", Some(property), _) => out.push(Decl {
+                bucket: bucket_of(conditions, node.important == Some(true)),
                 property: property.clone(),
-                important: node.important == Some(true),
             }),
             ("rule", _, Some(children)) => {
                 let selector = node.selector.as_deref().unwrap_or("");
-                let next = if unescape(selector) == format!(".{candidate}") {
-                    conditions.to_vec()
+                if unescape(selector).strip_prefix('.') == Some(candidate) {
+                    collect(children, conditions, candidate, out);
                 } else {
                     let mut next = conditions.to_vec();
                     next.push(selector.to_string());
-                    next
-                };
-                collect(children, &next, candidate, out);
+                    collect(children, &next, candidate, out);
+                }
             }
             ("at-rule", _, Some(children)) => {
                 let name = node.name.as_deref().unwrap_or("");
                 if NON_SCOPING.contains(&name) {
                     continue;
                 }
-                let next = if name == "@layer" {
-                    conditions.to_vec()
+                if name == "@layer" {
+                    collect(children, conditions, candidate, out);
                 } else {
                     let mut next = conditions.to_vec();
                     next.push(format!("{name} {}", node.params.as_deref().unwrap_or("")));
-                    next
-                };
-                collect(children, &next, candidate, out);
+                    collect(children, &next, candidate, out);
+                }
             }
             (_, _, Some(children)) => collect(children, conditions, candidate, out),
             _ => {}
@@ -160,8 +123,7 @@ fn collect(nodes: &[AstNode], conditions: &[String], candidate: &str, out: &mut 
 /// plain pseudo-class or attribute selectors on &. A condition that reaches a
 /// different box (a pseudo-element, or any selector with a combinator) makes
 /// everything nested inside it apply there, so its position pins the stretch
-/// boundaries. Same reasoning as bucket_of in parse.rs, applied to compiled
-/// output; `order_normalize` there does the sorting for both.
+/// boundaries. `order_normalize` in parse.rs does the sorting.
 fn bucket_of(conditions: &[String], important: bool) -> String {
     fn sensitive(condition: &str) -> bool {
         !condition.starts_with('@')
@@ -181,8 +143,8 @@ fn bucket_of(conditions: &[String], important: bool) -> String {
 /// the one it names. This is CSS knowledge, not Tailwind knowledge, so it
 /// does not rot with releases. Scoped to what utilities plausibly emit;
 /// extend it when dogfooding finds a gap.
-static COVERED_BY: LazyLock<HashMap<String, Vec<String>>> = LazyLock::new(|| {
-    let mut table: HashMap<String, Vec<String>> = HashMap::new();
+static COVERED_BY: LazyLock<FxHashMap<String, Vec<String>>> = LazyLock::new(|| {
+    let mut table: FxHashMap<String, Vec<String>> = FxHashMap::default();
     let mut covered = |child: String, parents: &[String]| {
         table.insert(child, parents.to_vec());
     };
@@ -386,16 +348,9 @@ fn decls_of(candidate: &str, roots: &[AstNode]) -> Option<Vec<Decl>> {
     if roots.is_empty() {
         return None;
     }
-    let mut raw = Vec::new();
-    collect(roots, &[], candidate, &mut raw);
-    Some(
-        raw.into_iter()
-            .map(|decl| Decl {
-                bucket: bucket_of(&decl.conditions, decl.important),
-                property: decl.property,
-            })
-            .collect(),
-    )
+    let mut decls = Vec::new();
+    collect(roots, &[], candidate, &mut decls);
+    Some(decls)
 }
 
 /// The compiled slice of a design system the oracles need: every candidate
@@ -403,7 +358,7 @@ fn decls_of(candidate: &str, roots: &[AstNode]) -> Option<Vec<Decl>> {
 /// from a batch of ASTs; judging is pure from here on.
 #[derive(Debug, Clone, Default)]
 pub struct CompiledCandidates {
-    decls: HashMap<String, Option<Vec<Decl>>>,
+    decls: FxHashMap<String, Option<Vec<Decl>>>,
 }
 
 impl CompiledCandidates {
@@ -494,26 +449,23 @@ impl CssOracle {
 
 impl Oracle for CssOracle {
     fn losers(&self, classes: &str) -> Vec<String> {
-        let raw: Vec<&str> = classes.split_whitespace().collect();
-        let mut seen = HashSet::new();
-        let tokens: Vec<&str> = raw.iter().copied().filter(|t| seen.insert(*t)).collect();
-        let position: HashMap<&str, usize> = tokens
-            .iter()
-            .map(|token| {
-                (
-                    *token,
-                    raw.iter()
-                        .rposition(|t| t == token)
-                        .expect("token came from raw"),
-                )
-            })
-            .collect();
+        // One pass: last insert wins, so the map holds each token's last
+        // position (the instance the cascade reads) while `tokens` keeps
+        // first-appearance order for the report.
+        let mut position: FxHashMap<&str, usize> = FxHashMap::default();
+        let mut tokens: Vec<&str> = Vec::new();
+        for (i, token) in classes.split_whitespace().enumerate() {
+            if position.insert(token, i).is_none() {
+                tokens.push(token);
+            }
+        }
 
-        let decls_for = |token: &str| self.candidates.decls.get(token).and_then(Option::as_ref);
-        let known: Vec<&str> = tokens
+        let known: Vec<(usize, &str, &[Decl])> = tokens
             .iter()
-            .copied()
-            .filter(|t| decls_for(t).is_some())
+            .filter_map(|token| {
+                let decls = self.candidates.decls.get(*token)?.as_deref()?;
+                Some((position[token], *token, decls))
+            })
             .collect();
 
         // A declaration is beaten when a later token declares the same or a
@@ -525,25 +477,19 @@ impl Oracle for CssOracle {
         // them. fix removes nothing that could reach a pixel.
         known
             .iter()
-            .filter(|token| {
-                let decls = decls_for(token).expect("known tokens have declarations");
-                if decls.is_empty() {
-                    return false;
-                }
-                decls.iter().all(|decl| {
-                    known.iter().any(|other| {
-                        position[other] > position[*token]
-                            && decls_for(other)
-                                .expect("known tokens have declarations")
-                                .iter()
-                                .any(|own| {
+            .filter(|(position, _, decls)| {
+                !decls.is_empty()
+                    && decls.iter().all(|decl| {
+                        known.iter().any(|(other, _, own_decls)| {
+                            other > position
+                                && own_decls.iter().any(|own| {
                                     own.bucket == decl.bucket
                                         && overrides(&own.property, &decl.property)
                                 })
+                        })
                     })
-                })
             })
-            .map(|token| token.to_string())
+            .map(|(_, token, _)| token.to_string())
             .collect()
     }
 }
@@ -552,7 +498,7 @@ impl Oracle for CssOracle {
 /// classes either. Typos, usually. Classes defined outside Tailwind land here
 /// too, so treat the report as a lead, not a verdict.
 pub struct TypoOracle {
-    known: HashSet<String>,
+    known: FxHashSet<String>,
 }
 
 impl TypoOracle {
@@ -569,7 +515,7 @@ impl TypoOracle {
 
 impl Oracle for TypoOracle {
     fn losers(&self, classes: &str) -> Vec<String> {
-        let mut seen = HashSet::new();
+        let mut seen = FxHashSet::default();
         classes
             .split_whitespace()
             .filter(|token| seen.insert(*token) && !self.known.contains(*token))
@@ -583,21 +529,7 @@ mod tests {
     use super::*;
 
     fn compiled(fixture: &str) -> CompiledCandidates {
-        let parsed: serde_json::Value = serde_json::from_str(fixture).unwrap();
-        let asts: Vec<(String, Vec<AstNode>)> = parsed
-            .as_object()
-            .unwrap()
-            .iter()
-            .map(|(token, nodes)| {
-                let nodes = nodes
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|node| AstNode::from_value(node).unwrap())
-                    .collect();
-                (token.clone(), nodes)
-            })
-            .collect();
+        let asts: BTreeMap<String, Vec<AstNode>> = serde_json::from_str(fixture).unwrap();
         CompiledCandidates::from_asts(asts)
     }
 
@@ -839,9 +771,9 @@ mod tests {
                     .is_some_and(|losers| losers.iter().any(|l| l.as_str() == Some(loser)))
         };
         let raw: Vec<&str> = classes.split_whitespace().collect();
-        let mut seen = HashSet::new();
+        let mut seen = FxHashSet::default();
         let tokens: Vec<&str> = raw.iter().copied().filter(|t| seen.insert(*t)).collect();
-        let position: HashMap<&str, usize> = tokens
+        let position: FxHashMap<&str, usize> = tokens
             .iter()
             .map(|token| (*token, raw.iter().rposition(|t| t == token).unwrap()))
             .collect();

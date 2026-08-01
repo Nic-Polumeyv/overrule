@@ -37,6 +37,8 @@ const DEFAULT_ATTRIBUTES = ['class', 'className'];
 /** @type {Map<string, { mtime: number, size: number, oracle: import('./index.js').Oracle }>} */
 const cache = new Map();
 
+const WHITESPACE = /\s+/;
+
 /** @param {unknown} error */
 function message(error) {
 	return error instanceof Error ? error.message : String(error);
@@ -133,14 +135,13 @@ function collectStrings(node, out, skip) {
 }
 
 /**
- * The literal with losing tokens removed and exact duplicates collapsed into
- * their last occurrence. A direct port of without_losers in src/scan.rs, so
- * this fix and `overrule fix` emit the same bytes for the same literal.
- * @param {string} literal
+ * The literal's tokens with the losers removed and exact duplicates collapsed
+ * into their last occurrence. A direct port of without_losers in src/scan.rs,
+ * so this fix and `overrule fix` emit the same bytes for the same literal.
+ * @param {string[]} tokens
  * @param {string[]} dropped
  */
-function withoutLosers(literal, dropped) {
-	const tokens = literal.split(/\s+/).filter((token) => token !== '');
+function withoutLosers(tokens, dropped) {
 	/** @type {Map<string, number>} */
 	const last = new Map();
 	tokens.forEach((token, index) => last.set(token, index));
@@ -218,7 +219,7 @@ const noConflicts = {
 		function judgeNode(node) {
 			const value = staticString(node);
 			if (value === null) return;
-			const tokens = value.split(/\s+/).filter((token) => token !== '');
+			const tokens = value.split(WHITESPACE).filter((token) => token !== '');
 			if (tokens.length < 2) return;
 			const conflict = findConflicts(value, oracle);
 			if (conflict === null) return;
@@ -230,7 +231,7 @@ const noConflicts = {
 			};
 			if (fixableLiteral(node)) {
 				report.fix = (/** @type {any} */ fixer) =>
-					fixer.replaceText(node, node.raw[0] + withoutLosers(value, conflict.dropped) + node.raw[0]);
+					fixer.replaceText(node, node.raw[0] + withoutLosers(tokens, conflict.dropped) + node.raw[0]);
 			}
 			context.report(report);
 		}

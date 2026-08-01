@@ -75,34 +75,12 @@ export function combos(axes) {
  * @returns {void}
  */
 export function assertVariantsMergeFree(variants, axes, oracle) {
-	const keys = Object.keys(axes);
-	const n = keys.length;
-	/** @type {Record<string, string>} */
-	const cur = {};
-
-	/** @param {number} i */
-	function walk(i) {
-		if (i === n) {
-			const combo = { ...cur };
-
-			try {
-				assertMergeFree(variants(combo), oracle);
-			} catch (error) {
-				const detail = error instanceof Error ? error.message : String(error);
-				throw new Error(`variant combo ${JSON.stringify(combo)}: ${detail}`);
-			}
-
-			return;
-		}
-
-		const key = keys[i];
-		const values = axes[key];
-
-		for (let j = 0, l = values.length; j < l; j++) {
-			cur[key] = values[j];
-			walk(i + 1);
+	for (const combo of combos(axes)) {
+		try {
+			assertMergeFree(variants(combo), oracle);
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : String(error);
+			throw new Error(`variant combo ${JSON.stringify(combo)}: ${detail}`);
 		}
 	}
-
-	walk(0);
 }

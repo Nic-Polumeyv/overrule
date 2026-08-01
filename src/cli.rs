@@ -398,6 +398,17 @@ fn version() -> ! {
     exit(0)
 }
 
+fn unrecognized_subcommand(name: &str) -> ! {
+    let tip = did_you_mean(name, SUBS.iter().map(|sub| sub.name).chain(["help"]))
+        .map(|s| format!("a similar subcommand exists: '{s}'"));
+    fail(
+        &format!("unrecognized subcommand '{name}'"),
+        tip,
+        Some("overrule [COMMAND]"),
+        true,
+    )
+}
+
 /// Parse std::env::args_os. None is bare `overrule`, the caller's business;
 /// help, version, and every parse error print and exit here.
 pub fn parse() -> Option<Command> {
@@ -435,14 +446,7 @@ pub fn parse() -> Option<Command> {
                     true,
                 );
             }
-            let tip = did_you_mean(&next, SUBS.iter().map(|sub| sub.name).chain(["help"]))
-                .map(|s| format!("a similar subcommand exists: '{s}'"));
-            fail(
-                &format!("unrecognized subcommand '{next}'"),
-                tip,
-                Some("overrule [COMMAND]"),
-                true,
-            )
+            unrecognized_subcommand(&next)
         }
         _ => {}
     }
@@ -502,14 +506,7 @@ pub fn parse() -> Option<Command> {
             ),
         }
     }
-    let tip = did_you_mean(&name, SUBS.iter().map(|sub| sub.name).chain(["help"]))
-        .map(|s| format!("a similar subcommand exists: '{s}'"));
-    fail(
-        &format!("unrecognized subcommand '{name}'"),
-        tip,
-        Some("overrule [COMMAND]"),
-        true,
-    )
+    unrecognized_subcommand(&name)
 }
 
 /// The help subcommand: no tips anywhere on this path, and the help-of-help

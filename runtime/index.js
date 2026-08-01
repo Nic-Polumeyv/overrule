@@ -166,32 +166,30 @@ export function declareVariants(config) {
 		f[i] = d[k];
 	}
 
-	let z = b;
+	/** @param {Record<string, string | boolean | null | undefined> & { class?: string }} p */
+	const compute = (p) => {
+		let o = b;
 
-	for (let i = 0; i < n; i++) {
-		const s = f[i];
-		const x = s == null ? undefined : pick(m[i], s);
-		if (x) z += z ? ' ' + x : x;
-	}
+		for (let i = 0; i < n; i++) {
+			let s = p[a[i]];
+			s = s === undefined ? f[i] : s;
+
+			if (s != null) {
+				const x = pick(m[i], s);
+				if (x) o += o ? ' ' + x : x;
+			}
+		}
+
+		const c = trailing(p.class);
+		return c ? (o ? o + ' ' + c : c) : o;
+	};
+
+	// The no-props string never changes, so calls without props return the
+	// one computed at declare time.
+	const z = compute({});
 
 	return /** @type {import('./index.js').VariantFn<S>} */ (
-		(/** @type {(Record<string, string | boolean | null | undefined> & { class?: string }) | undefined} */ p) => {
-			if (p == null) return z;
-
-			let o = b;
-
-			for (let i = 0; i < n; i++) {
-				let s = p[a[i]];
-				s = s === undefined ? f[i] : s;
-
-				if (s != null) {
-					const x = pick(m[i], s);
-					if (x) o += o ? ' ' + x : x;
-				}
-			}
-
-			const c = trailing(p.class);
-			return c ? (o ? o + ' ' + c : c) : o;
-		}
+		(/** @type {(Record<string, string | boolean | null | undefined> & { class?: string }) | undefined} */ p) =>
+			p == null ? z : compute(p)
 	);
 }

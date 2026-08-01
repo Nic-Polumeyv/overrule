@@ -6,42 +6,12 @@
 /// A parsed class token.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parsed {
-    /// The token as written.
-    pub raw: String,
     /// Variant prefixes in source order, e.g. ["md", "hover"] or ["data-[state=open]"].
     pub variants: Vec<String>,
-    /// Canonical bucket key: variants order-normalized, importance included.
-    /// Two tokens can only conflict when their buckets match.
-    pub bucket: String,
     /// The utility itself, with arbitrary values and slash modifiers intact.
     pub base: String,
     /// Trailing ! (the v4 position) or leading ! (the legacy position v4 still accepts).
     pub important: bool,
-}
-
-/// Variant order matters only for pseudo-element-like variants: hover:before:
-/// and before:hover: style different boxes, while hover:md: and md:hover: are
-/// the same rule. This is CSS pseudo-element knowledge, not Tailwind version
-/// knowledge, so it does not rot with releases. Arbitrary variants are treated
-/// as order-sensitive too, because they can contain pseudo-element selectors
-/// and structure alone cannot tell.
-const ORDER_SENSITIVE: &[&str] = &[
-    "*",
-    "**",
-    "after",
-    "backdrop",
-    "before",
-    "details-content",
-    "file",
-    "first-letter",
-    "first-line",
-    "marker",
-    "placeholder",
-    "selection",
-];
-
-fn is_order_sensitive(variant: &str) -> bool {
-    variant.starts_with('[') || ORDER_SENSITIVE.contains(&variant)
 }
 
 /// Split a token on top-level colons, ignoring colons inside [], (), and quotes.
@@ -77,8 +47,8 @@ fn split_top_level(token: &str) -> Vec<&str> {
 /// Sort elements that commute, keep the ones that do not where they are.
 /// Elements commute only within the stretch between order-sensitive ones, so
 /// each stretch sorts on its own and the order-sensitive elements pin the
-/// boundaries. What counts as order-sensitive is the caller's call: variants
-/// here, compiled conditions in [`crate::css`].
+/// boundaries. What counts as order-sensitive is the caller's call:
+/// [`crate::css`] sorts compiled conditions with it.
 pub fn order_normalize<S: AsRef<str>>(
     elements: &[S],
     order_sensitive: impl Fn(&str) -> bool,
@@ -101,17 +71,6 @@ pub fn order_normalize<S: AsRef<str>>(
     normalized.join(separator)
 }
 
-/// Order-normalize variants into a bucket key. Variants commute only within
-/// the stretch between order-sensitive ones: hover before a pseudo-element
-/// reaches a different box than hover after it.
-pub fn bucket_of<S: AsRef<str>>(variants: &[S], important: bool) -> String {
-    let mut bucket = order_normalize(variants, is_order_sensitive, ":");
-    if important {
-        bucket.push('!');
-    }
-    bucket
-}
-
 /// Parse one class token into variants, base, and importance.
 pub fn parse(raw: &str) -> Parsed {
     let parts = split_top_level(raw);
@@ -127,11 +86,8 @@ pub fn parse(raw: &str) -> Parsed {
         important = true;
         base = stripped;
     }
-    let variants: Vec<String> = variant_parts.iter().map(|s| s.to_string()).collect();
     Parsed {
-        raw: raw.to_string(),
-        bucket: bucket_of(&variants, important),
-        variants,
+        variants: variant_parts.iter().map(|s| s.to_string()).collect(),
         base: base.to_string(),
         important,
     }
@@ -146,9 +102,7 @@ mod tests {
         assert_eq!(
             parse("h-9"),
             Parsed {
-                raw: "h-9".into(),
                 variants: vec![],
-                bucket: "".into(),
                 base: "h-9".into(),
                 important: false,
             }
@@ -241,53 +195,19 @@ mod tests {
     }
 
     #[test]
-    fn order_insensitive_variants_share_a_bucket() {
-        assert_eq!(parse("hover:md:p-4").bucket, parse("md:hover:p-4").bucket);
-    }
-
-    #[test]
-    fn pseudo_element_variants_do_not() {
-        assert_ne!(
-            parse("before:hover:underline").bucket,
-            parse("hover:before:underline").bucket
-        );
-    }
-
-    #[test]
-    fn arbitrary_variants_are_treated_as_order_sensitive() {
-        assert_ne!(
-            parse("[&>svg]:hover:opacity-50").bucket,
-            parse("hover:[&>svg]:opacity-50").bucket
-        );
-    }
-
-    #[test]
-    fn variants_on_opposite_sides_of_a_pseudo_element_stay_distinct() {
-        assert_ne!(
-            parse("focus:before:underline").bucket,
-            parse("before:focus:underline").bucket
+    fn order_normalize_sorts_within_stretches_and_pins_sensitive_elements() {
+        let sensitive = |e: &str| e == "before";
+        assert_eq!(
+            order_normalize(&["sm", "dark", "hover"], sensitive, ":"),
+            order_normalize(&["hover", "sm", "dark"], sensitive, ":")
         );
         assert_ne!(
-            parse("md:before:hover:m-1").bucket,
-            parse("hover:md:before:m-1").bucket
+            order_normalize(&["focus", "before"], sensitive, ":"),
+            order_normalize(&["before", "focus"], sensitive, ":")
         );
         assert_eq!(
-            parse("md:hover:before:m-1").bucket,
-            parse("hover:md:before:m-1").bucket
-        );
-    }
-
-    #[test]
-    fn importance_separates_buckets() {
-        assert_ne!(parse("p-4").bucket, parse("p-4!").bucket);
-        assert_eq!(parse("md:p-4!").bucket, parse("md:p-2!").bucket);
-    }
-
-    #[test]
-    fn permutation_invariance_for_plain_variants() {
-        assert_eq!(
-            bucket_of(&["sm", "dark", "hover"], false),
-            bucket_of(&["hover", "sm", "dark"], false)
+            order_normalize(&["md", "hover", "before", "m-1"], sensitive, ":"),
+            order_normalize(&["hover", "md", "before", "m-1"], sensitive, ":")
         );
     }
 }

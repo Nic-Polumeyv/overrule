@@ -11,8 +11,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Package names must match PACKAGES in npm/launcher.cjs; the two lists have
-// drifted before. Both linux x64 packages declare the same os and cpu, so
+// Both linux x64 packages declare the same os and cpu, so
 // the libc field is what stops installers that understand it (npm >= 10.4,
 // pnpm, yarn) from fetching the wrong one; older installers fetch both and
 // the launcher picks at runtime. Windows is never win32 in a name: npm's

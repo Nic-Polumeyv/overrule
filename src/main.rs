@@ -53,7 +53,11 @@ impl Oracle for TokenCollector {
     fn losers(&self, classes: &str) -> Vec<String> {
         let mut tokens = self.0.lock().expect("no panics while holding the lock");
         for token in classes.split_whitespace() {
-            tokens.insert(token.to_string());
+            // contains first: insert would allocate the String even for the
+            // repeats that dominate real corpora, inside the lock.
+            if !tokens.contains(token) {
+                tokens.insert(token.to_string());
+            }
         }
         Vec::new()
     }
@@ -74,7 +78,7 @@ fn compiled_candidates(
         .into_iter()
         .collect();
     tokens.sort_unstable();
-    let asts = compile_candidates(&tokens, css_entry.map(PathBuf::as_path))?;
+    let asts = compile_candidates(tokens, css_entry.map(PathBuf::as_path))?;
     Ok(CompiledCandidates::from_asts(asts))
 }
 
@@ -151,7 +155,7 @@ fn judge(args: JudgeArgs) -> ExitCode {
         args.literals
     };
 
-    let verdicts: Vec<(String, Vec<String>)> = match &args.css {
+    let oracle: Box<dyn Oracle> = match &args.css {
         Some(entry) => {
             let mut tokens: Vec<String> = literals
                 .iter()
@@ -161,32 +165,23 @@ fn judge(args: JudgeArgs) -> ExitCode {
                 .into_iter()
                 .collect();
             tokens.sort_unstable();
-            let oracle = match compile_candidates(&tokens, Some(entry.as_path())) {
-                Ok(asts) => CssOracle::new(CompiledCandidates::from_asts(asts)),
+            match compile_candidates(tokens, Some(entry.as_path())) {
+                Ok(asts) => Box::new(CssOracle::new(CompiledCandidates::from_asts(asts))),
                 Err(message) => {
                     eprintln!("{message}");
                     return ExitCode::FAILURE;
                 }
-            };
-            literals
-                .into_iter()
-                .map(|l| {
-                    let dropped = oracle.losers(&l);
-                    (l, dropped)
-                })
-                .collect()
+            }
         }
-        None => {
-            let oracle = Memo::new(TwFuseOracle);
-            literals
-                .into_iter()
-                .map(|l| {
-                    let dropped = oracle.losers(&l);
-                    (l, dropped)
-                })
-                .collect()
-        }
+        None => Box::new(Memo::new(TwFuseOracle)),
     };
+    let verdicts: Vec<(String, Vec<String>)> = literals
+        .into_iter()
+        .map(|l| {
+            let dropped = oracle.losers(&l);
+            (l, dropped)
+        })
+        .collect();
 
     let conflicts = verdicts.iter().filter(|(_, d)| !d.is_empty()).count();
 
@@ -393,8 +388,10 @@ fn verdict(dropped: Option<&Vec<String>>) -> String {
 
 fn cross(args: CrossArgs) -> ExitCode {
     let files = read_paths(&args.scan.paths);
-    let (css_oracle, _) = match css_oracles(&files, args.scan.css.as_ref()) {
-        Ok(oracles) => oracles,
+    // Not css_oracles: cross never judges typos, and the TypoOracle build
+    // clones every compiled token.
+    let css_oracle = match compiled_candidates(&files, args.scan.css.as_ref()) {
+        Ok(compiled) => CssOracle::new(compiled),
         Err(message) => {
             eprintln!("{message}");
             return ExitCode::FAILURE;

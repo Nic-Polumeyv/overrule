@@ -151,24 +151,17 @@ fn patch_for(base: &str) -> Option<Patch> {
     // overflow-x and overflow-y apart, and only a later plain overflow defeats
     // them. line-clamp defeats plain overflow in both engines, so with plain
     // overflow judged here, that defeat has to follow it in.
-    if let Some(value) = base.strip_prefix("overflow-x-") {
+    if let Some(rest) = base.strip_prefix("overflow-") {
+        let (group, value, conquers) = if let Some(value) = rest.strip_prefix("x-") {
+            ("overflow-x", value, &[][..])
+        } else if let Some(value) = rest.strip_prefix("y-") {
+            ("overflow-y", value, &[][..])
+        } else {
+            ("overflow", rest, &["overflow-x", "overflow-y"][..])
+        };
         return OVERFLOWS.contains(&value).then_some(Patch {
-            group: "overflow-x",
-            conquers: &[],
-            ghost: false,
-        });
-    }
-    if let Some(value) = base.strip_prefix("overflow-y-") {
-        return OVERFLOWS.contains(&value).then_some(Patch {
-            group: "overflow-y",
-            conquers: &[],
-            ghost: false,
-        });
-    }
-    if let Some(value) = base.strip_prefix("overflow-") {
-        return OVERFLOWS.contains(&value).then_some(Patch {
-            group: "overflow",
-            conquers: &["overflow-x", "overflow-y"],
+            group,
+            conquers,
             ghost: false,
         });
     }
@@ -289,12 +282,6 @@ fn bg_patch(value: &str) -> Option<Patch> {
     if strip_modifier(value) == "radial" {
         return Patch::of("background-image");
     }
-    if let Some(rest) = value.strip_prefix("radial-") {
-        if arbitrary(rest).is_some() {
-            return Patch::of("background-image");
-        }
-        return None;
-    }
     if let Some(rest) = value.strip_prefix("conic-") {
         if arbitrary(rest).is_some() || is_integer(strip_modifier(rest)) {
             return Patch::of("background-image");
@@ -304,20 +291,23 @@ fn bg_patch(value: &str) -> Option<Patch> {
     if matches!(value, "auto" | "cover" | "contain") {
         return Patch::of("background-size");
     }
-    if let Some(rest) = value.strip_prefix("size-") {
-        if arbitrary(rest).is_some() {
-            return Patch::of("background-size");
-        }
-        return None;
-    }
     if BG_POSITIONS.contains(&value) {
         return Patch::of("background-position");
     }
-    if let Some(rest) = value.strip_prefix("position-") {
-        if arbitrary(rest).is_some() {
-            return Patch::of("background-position");
+    // The prefixed spellings only carry arbitrary values; named values after
+    // the prefix compile to nothing.
+    for (prefix, group) in [
+        ("radial-", "background-image"),
+        ("size-", "background-size"),
+        ("position-", "background-position"),
+    ] {
+        if let Some(rest) = value.strip_prefix(prefix) {
+            return if arbitrary(rest).is_some() {
+                Patch::of(group)
+            } else {
+                None
+            };
         }
-        return None;
     }
     if let Some(content) = arbitrary(value) {
         return match label_of(content) {

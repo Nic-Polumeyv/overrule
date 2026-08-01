@@ -57,7 +57,7 @@ fn stage_script() -> Result<StagedScript, String> {
 /// `css_entry` is the stylesheet that imports tailwindcss; without it, a bare
 /// import resolved from the current directory.
 pub fn compile_candidates(
-    tokens: &[String],
+    tokens: Vec<String>,
     css_entry: Option<&Path>,
 ) -> Result<Vec<(String, Vec<AstNode>)>, String> {
     let script = stage_script()?;
@@ -75,7 +75,7 @@ pub fn compile_candidates(
         .spawn()
         .map_err(|e| format!("could not run node, which the stylesheet oracle needs: {e}"))?;
 
-    let payload = serde_json::to_vec(tokens).expect("a token list serializes");
+    let payload = serde_json::to_vec(&tokens).expect("a token list serializes");
     // Written from a thread while the parent reads: a payload past the pipe
     // capacity would otherwise block against a child that errors before
     // draining stdin, and the broken-pipe write would mask node's own
@@ -92,24 +92,7 @@ pub fn compile_candidates(
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
-    let answer: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .map_err(|e| format!("could not read Tailwind's answer: {e}"))?;
-    let asts: Vec<Vec<AstNode>> = answer
-        .as_array()
-        .ok_or_else(|| "expected a list of ASTs".to_string())
-        .and_then(|lists| {
-            lists
-                .iter()
-                .map(|nodes| {
-                    nodes
-                        .as_array()
-                        .ok_or_else(|| "expected a node list".to_string())?
-                        .iter()
-                        .map(AstNode::from_value)
-                        .collect()
-                })
-                .collect()
-        })
+    let asts: Vec<Vec<AstNode>> = serde_json::from_slice(&output.stdout)
         .map_err(|e| format!("could not read Tailwind's answer: {e}"))?;
     // zip would silently truncate and misread absent tokens as typos.
     if asts.len() != tokens.len() {
@@ -119,5 +102,5 @@ pub fn compile_candidates(
             asts.len()
         ));
     }
-    Ok(tokens.iter().cloned().zip(asts).collect())
+    Ok(tokens.into_iter().zip(asts).collect())
 }
