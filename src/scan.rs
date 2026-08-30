@@ -4,8 +4,6 @@
 //! literals only; caller-vs-component conflicts only exist at runtime, which
 //! is the npm package's guard's job.
 
-use std::collections::HashMap;
-
 use crate::hash::{FxHashMap, FxHashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -380,7 +378,7 @@ pub fn scan_paths(paths: &[PathBuf], oracle: &(dyn Oracle + Sync)) -> Vec<Findin
 /// Rewrite each conflicting literal to its merged form. Returns the count of
 /// files changed.
 pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
-    let mut by_file: HashMap<&PathBuf, Vec<&Conflict>> = HashMap::new();
+    let mut by_file: FxHashMap<&PathBuf, Vec<&Conflict>> = FxHashMap::default();
     for finding in findings {
         by_file
             .entry(&finding.file)

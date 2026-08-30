@@ -4,7 +4,6 @@
 //! and --ack. The tables side is tailwind-fuse instead of tailwind-merge;
 //! cross exists precisely because ports drift.
 
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Mutex;
@@ -13,6 +12,7 @@ use serde_json::json;
 
 use overrule::bridge::compile_candidates;
 use overrule::css::{CompiledCandidates, CssOracle, TypoOracle};
+use overrule::hash::{FxHashMap, FxHashSet};
 use overrule::oracle::{Memo, Oracle, TwFuseOracle};
 use overrule::scan::{
     Finding, SourceFile, apply_fixes, read_paths, scan_files, scan_paths, without_losers,
@@ -47,7 +47,7 @@ fn main() -> ExitCode {
 /// so the set sits behind a Mutex; a RefCell would compile for one thread
 /// and be rejected the moment scan_paths went parallel.
 #[derive(Default)]
-struct TokenCollector(Mutex<HashSet<String>>);
+struct TokenCollector(Mutex<FxHashSet<String>>);
 
 impl Oracle for TokenCollector {
     fn losers(&self, classes: &str) -> Vec<String> {
@@ -161,7 +161,7 @@ fn judge(args: JudgeArgs) -> ExitCode {
                 .iter()
                 .flat_map(|l| l.split_whitespace())
                 .map(str::to_string)
-                .collect::<HashSet<_>>()
+                .collect::<FxHashSet<_>>()
                 .into_iter()
                 .collect();
             tokens.sort_unstable();
@@ -404,7 +404,7 @@ fn cross(args: CrossArgs) -> ExitCode {
     // whole lifetime and block the field writes below, so this is a plain fn
     // that takes its borrows per call and hands back the entry itself.
     fn upsert<'a>(
-        entries: &'a mut HashMap<(String, usize), CrossEntry>,
+        entries: &'a mut FxHashMap<(String, usize), CrossEntry>,
         order: &mut Vec<(String, usize)>,
         finding: &Finding,
     ) -> &'a mut CrossEntry {
@@ -426,7 +426,7 @@ fn cross(args: CrossArgs) -> ExitCode {
     }
 
     let mut order: Vec<(String, usize)> = Vec::new();
-    let mut entries: HashMap<(String, usize), CrossEntry> = HashMap::new();
+    let mut entries: FxHashMap<(String, usize), CrossEntry> = FxHashMap::default();
     for finding in &tables {
         upsert(&mut entries, &mut order, finding).tables = Some(finding.conflict.dropped.clone());
     }
@@ -483,11 +483,11 @@ fn cross(args: CrossArgs) -> ExitCode {
         };
         let entries: &[serde_json::Value] = list.as_array().map(Vec::as_slice).unwrap_or(&[]);
         ack_total = entries.len();
-        let known: HashSet<String> = entries.iter().map(entry_signature).collect();
+        let known: FxHashSet<String> = entries.iter().map(entry_signature).collect();
         // An entry that matches no current disagreement is a disagreement
         // that no longer exists. It gets reported so snapshots stop
         // accumulating dead entries, and it never affects the exit code.
-        let current: HashSet<String> = diffs
+        let current: FxHashSet<String> = diffs
             .iter()
             .map(|entry| signature(&entry.literal, entry.tables.as_ref(), entry.sheet.as_ref()))
             .collect();
