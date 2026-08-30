@@ -515,12 +515,9 @@ impl TypoOracle {
 
 impl Oracle for TypoOracle {
     fn losers(&self, classes: &str) -> Vec<String> {
-        let mut seen = FxHashSet::default();
-        classes
-            .split_whitespace()
-            .filter(|token| seen.insert(*token) && !self.known.contains(*token))
-            .map(str::to_string)
-            .collect()
+        crate::oracle::losers_in_order(classes.split_whitespace(), |token| {
+            !self.known.contains(token)
+        })
     }
 }
 

@@ -11,6 +11,19 @@ pub trait Oracle {
     fn losers(&self, classes: &str) -> Vec<String>;
 }
 
+/// The report shape every oracle shares: tokens deduplicated to their first
+/// appearance, kept when `lost` claims them, owned.
+pub(crate) fn losers_in_order<'a>(
+    tokens: impl Iterator<Item = &'a str>,
+    lost: impl Fn(&str) -> bool,
+) -> Vec<String> {
+    let mut seen: FxHashSet<&str> = FxHashSet::default();
+    tokens
+        .filter(|token| seen.insert(token) && lost(token))
+        .map(str::to_string)
+        .collect()
+}
+
 /// Any closure with the right shape is an oracle, so tests can inject fakes
 /// without ceremony.
 impl<F: Fn(&str) -> Vec<String>> Oracle for F {
@@ -92,13 +105,7 @@ impl Oracle for TwFuseOracle {
                 lost.insert(token.to_string());
             }
         }
-        let mut seen: FxHashSet<&str> = FxHashSet::default();
-        tokens
-            .iter()
-            .copied()
-            .filter(|token| seen.insert(*token) && lost.contains(*token))
-            .map(str::to_string)
-            .collect()
+        losers_in_order(tokens.iter().copied(), |token| lost.contains(token))
     }
 }
 
@@ -553,12 +560,7 @@ fn judge(classes: &str) -> Vec<String> {
     if !classes.contains('!') && !classes.contains("text-base/") {
         let merged = tailwind_fuse::merge::tw_merge(classes);
         let kept: FxHashSet<&str> = merged.split(' ').collect();
-        let mut seen = FxHashSet::default();
-        return classes
-            .split_whitespace()
-            .filter(|token| seen.insert(*token) && !kept.contains(token))
-            .map(str::to_string)
-            .collect();
+        return losers_in_order(classes.split_whitespace(), |token| !kept.contains(token));
     }
     let tokens: Vec<&str> = classes.split_whitespace().collect();
     let rewritten: Vec<String> = tokens.iter().map(|token| fuse_spelling(token)).collect();
