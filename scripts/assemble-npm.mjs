@@ -23,6 +23,7 @@ const TARGETS = {
 	'x86_64-unknown-linux-gnu': { name: 'overrule-linux-x64', os: 'linux', cpu: 'x64', libc: 'glibc', bin: 'overrule' },
 	'x86_64-unknown-linux-musl': { name: 'overrule-linux-x64-musl', os: 'linux', cpu: 'x64', libc: 'musl', bin: 'overrule' },
 	'aarch64-unknown-linux-gnu': { name: 'overrule-linux-arm64', os: 'linux', cpu: 'arm64', libc: 'glibc', bin: 'overrule' },
+	'aarch64-unknown-linux-musl': { name: 'overrule-linux-arm64-musl', os: 'linux', cpu: 'arm64', libc: 'musl', bin: 'overrule' },
 	'x86_64-apple-darwin': { name: 'overrule-darwin-x64', os: 'darwin', cpu: 'x64', bin: 'overrule' },
 	'aarch64-apple-darwin': { name: 'overrule-darwin-arm64', os: 'darwin', cpu: 'arm64', bin: 'overrule' },
 	'x86_64-pc-windows-msvc': { name: 'overrule-windows-x64', os: 'win32', cpu: 'x64', bin: 'overrule.exe' },

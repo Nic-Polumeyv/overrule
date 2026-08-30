@@ -48,12 +48,19 @@ jobs:
           # every distro back to CentOS 7.
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
+            zigbuild: true
             glibc: '2.17'
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
+            zigbuild: true
             glibc: '2.17'
+          # cross-compiled: static musl needs no runner match, and zig is the
+          # toolchain already proven on this codebase's C.
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-latest
+            zigbuild: true
           - target: x86_64-apple-darwin
             runner: macos-latest
           - target: aarch64-apple-darwin
@@ -83,15 +90,15 @@ jobs:
       - uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
-        if: matrix.glibc
+        if: matrix.zigbuild
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-zigbuild@0.23.3
-        if: matrix.glibc
-      - run: cargo zigbuild --release --target ${{ matrix.target }}.${{ matrix.glibc }}
-        if: matrix.glibc
+        if: matrix.zigbuild
+      - run: cargo zigbuild --release --target ${{ matrix.target }}${{ matrix.glibc && format('.{0}', matrix.glibc) || '' }}
+        if: matrix.zigbuild
       - run: cargo build --release --target ${{ matrix.target }}
-        if: ${{ !matrix.glibc }}
+        if: ${{ !matrix.zigbuild }}
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
@@ -132,9 +139,11 @@ jobs:
             echo "$p: highest glibc symbol $max"
             printf '%s\n' "$max" GLIBC_2.17 | sort -CV
           done
-          if objdump -T dist-npm/overrule-linux-x64-musl/overrule 2>/dev/null | grep -q GLIBC; then
-            echo "musl binary links glibc" && exit 1
-          fi
+          for p in overrule-linux-x64-musl overrule-linux-arm64-musl; do
+            if objdump -T "dist-npm/$p/overrule" 2>/dev/null | grep -q GLIBC; then
+              echo "$p links glibc" && exit 1
+            fi
+          done
       - run: docker run --rm -v "$PWD/dist-npm/overrule-linux-x64:/p:ro" public.ecr.aws/amazonlinux/amazonlinux:2023 /p/overrule --version
       # Publish on the workflow's OIDC identity (npm trusted publishing). Platform
       # packages first, wrapper last so it never references a version that isn't up
