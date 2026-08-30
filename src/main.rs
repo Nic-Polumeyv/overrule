@@ -139,6 +139,14 @@ fn display(finding: &Finding) -> String {
     finding.file.display().to_string()
 }
 
+/// The three-line conflict report judge and check share; one construction
+/// site keeps their output from drifting apart.
+fn print_conflict(dropped: &[String], literal: &str, fixed: &str) {
+    println!("  drops  {}", dropped.join(" "));
+    println!("  in     \"{literal}\"");
+    println!("  keeps  \"{fixed}\"");
+}
+
 /// Judge bare class strings with no scanner in between: the seam that lets a
 /// test suite ask the same engine check uses. A string that is not in a file
 /// has no line to point at, so verdicts come back in input order.
@@ -194,9 +202,7 @@ fn judge(args: JudgeArgs) -> Result<ExitCode, String> {
             if dropped.is_empty() {
                 continue;
             }
-            println!("  drops  {}", dropped.join(" "));
-            println!("  in     \"{literal}\"");
-            println!("  keeps  \"{}\"", without_losers(literal, dropped));
+            print_conflict(dropped, literal, &without_losers(literal, dropped));
         }
         println!(
             "\n{conflicts} conflicting class {}.",
@@ -280,9 +286,7 @@ fn check_or_fix(args: ScanArgs, fixing: bool) -> Result<ExitCode, String> {
         for finding in &findings {
             let c = &finding.conflict;
             println!("{}:{}", display(finding), c.line);
-            println!("  drops  {}", c.dropped.join(" "));
-            println!("  in     \"{}\"", c.literal);
-            println!("  keeps  \"{}\"", c.fixed);
+            print_conflict(&c.dropped, &c.literal, &c.fixed);
             if in_actions() && !fixing {
                 annotate(
                     &display(finding),
