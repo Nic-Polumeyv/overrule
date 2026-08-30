@@ -1,5 +1,11 @@
 # overrule
 
+## 0.7.5
+
+### Patch Changes
+
+- [`7930b97`](https://github.com/Nic-Polumeyv/overrule/commit/7930b978ea9e5c5db7e553c24103f1929d7e2c22) Thanks [@Nic-Polumeyv](https://github.com/Nic-Polumeyv)! - perf: the CLI's token collection and cross maps drop SipHash for FxHash
+
 ## 0.7.4
 
 ### Patch Changes
