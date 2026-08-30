@@ -1,23 +1,59 @@
 name: release
 
+# Fires on any main push that touches Cargo.toml; the gate lets the rest run
+# only when that version is not on npm yet. The version workflow's Version
+# Packages PR is what bumps Cargo.toml, so merging that PR is the release
+# act. The tag marks the release and is created after npm publish succeeds,
+# never before.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['Cargo.toml']
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+
 jobs:
+  gate:
+    if: github.repository == 'Nic-Polumeyv/overrule'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      new: ${{ steps.v.outputs.new }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: v
+        run: |
+          version=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if curl -sf -o /dev/null "https://registry.npmjs.org/overrule/$version"; then
+            echo "$version already on npm, nothing to release"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: gate
+    if: needs.gate.outputs.new == 'true'
     strategy:
       matrix:
         include:
+          # glibc is the floor the binary demands at runtime, not what it was
+          # built on. 2.17 matches Rust's own tier-1 linux floor and covers
+          # every distro back to CentOS 7.
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
+            glibc: '2.17'
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
+            glibc: '2.17'
           - target: x86_64-apple-darwin
             runner: macos-latest
           - target: aarch64-apple-darwin
@@ -40,7 +76,22 @@ jobs:
       # musl-gcc, which cc needs to compile mimalloc for the musl target.
       - run: sudo apt-get install -y musl-tools
         if: matrix.target == 'x86_64-unknown-linux-musl'
+      # zig links the linux-gnu targets against the pinned glibc floor; plain
+      # cargo build inherits the runner's glibc instead (0.7.2 shipped
+      # demanding 2.39 that way and died on everything older than Ubuntu 24.04).
+      # The zig version is the one cargo-zigbuild's own CI tests against.
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+        if: matrix.glibc
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild@0.23.3
+        if: matrix.glibc
+      - run: cargo zigbuild --release --target ${{ matrix.target }}.${{ matrix.glibc }}
+        if: matrix.glibc
       - run: cargo build --release --target ${{ matrix.target }}
+        if: ${{ !matrix.glibc }}
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
@@ -49,22 +100,16 @@ jobs:
             target/${{ matrix.target }}/release/overrule.exe
 
   test:
+    needs: gate
+    if: needs.gate.outputs.new == 'true'
     uses: ./.github/workflows/ci.yml
 
-  version-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      # The binary reports the crate version, npm reports the tag; 0.4.8
-      # shipped self-reporting 0.4.7 because nothing tied them together.
-      - run: grep -q "^version = \"${GITHUB_REF_NAME#v}\"" Cargo.toml
-
   release:
-    needs: [build, test, version-check]
+    needs: [gate, build, test]
     runs-on: ubuntu-latest
     permissions:
       id-token: write # OIDC trusted publishing — no NPM_TOKEN, no OTP
-      contents: write # gh release create
+      contents: write # tag push + gh release create
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -75,7 +120,22 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           path: binaries
-      - run: node scripts/assemble-npm.mjs "${GITHUB_REF_NAME#v}" binaries dist-npm
+      - run: node scripts/assemble-npm.mjs "${{ needs.gate.outputs.version }}" binaries dist-npm
+      # Gate the bytes that actually ship: gnu binaries hold the 2.17 floor
+      # (the objdump check napi-rs documents), the musl binary stays free of
+      # glibc, and the x64 binary must start on Amazon Linux 2023, where the
+      # 0.7.2 binaries died with `GLIBC_2.39 not found`.
+      - run: |
+          for p in overrule-linux-x64 overrule-linux-arm64; do
+            max=$(objdump -T "dist-npm/$p/overrule" | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
+            test -n "$max"
+            echo "$p: highest glibc symbol $max"
+            printf '%s\n' "$max" GLIBC_2.17 | sort -CV
+          done
+          if objdump -T dist-npm/overrule-linux-x64-musl/overrule 2>/dev/null | grep -q GLIBC; then
+            echo "musl binary links glibc" && exit 1
+          fi
+      - run: docker run --rm -v "$PWD/dist-npm/overrule-linux-x64:/p:ro" public.ecr.aws/amazonlinux/amazonlinux:2023 /p/overrule --version
       # Publish on the workflow's OIDC identity (npm trusted publishing). Platform
       # packages first, wrapper last so it never references a version that isn't up
       # yet. No token, no OTP; npm attaches provenance automatically.
@@ -94,6 +154,11 @@ jobs:
           }
           for p in dist-npm/overrule-*; do publish "$p"; done
           publish dist-npm/overrule
-      - run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+      # Tag and release after npm has the version; both steps stay idempotent
+      # so a re-driven run walks past what already exists.
+      - run: |
+          tag="v${{ needs.gate.outputs.version }}"
+          git ls-remote --exit-code --tags origin "$tag" || { git tag "$tag" && git push origin "$tag"; }
+          gh release view "$tag" || gh release create "$tag" --title "$tag" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
