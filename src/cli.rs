@@ -393,6 +393,27 @@ fn did_you_mean<'c>(value: &str, candidates: impl IntoIterator<Item = &'c str>) 
     best.map(|(_, candidate)| candidate)
 }
 
+fn fail_duplicate(sub: &Sub, flag: &Flag) -> ! {
+    fail(
+        &format!(
+            "the argument '{}' cannot be used multiple times",
+            render(flag)
+        ),
+        None,
+        Some(&usage(sub)),
+        true,
+    )
+}
+
+fn fail_missing_value(subject: &str) -> ! {
+    fail(
+        &format!("a value is required for '{subject}' but none was supplied"),
+        None,
+        None,
+        true,
+    )
+}
+
 fn version() -> ! {
     println!("overrule {}", env!("CARGO_PKG_VERSION"));
     exit(0)
@@ -571,15 +592,7 @@ enum Pending {
 fn fail_pending(sub: &Sub, pending: &Pending) -> ! {
     let subject = match pending {
         Pending::Flag(index) => render(&sub.flags[*index]),
-        Pending::Duplicate(index) => fail(
-            &format!(
-                "the argument '{}' cannot be used multiple times",
-                render(&sub.flags[*index])
-            ),
-            None,
-            Some(&usage(sub)),
-            true,
-        ),
+        Pending::Duplicate(index) => fail_duplicate(sub, &sub.flags[*index]),
         Pending::Positional => format!("[{}]...", sub.positional),
         Pending::InvalidUtf8 => fail(
             "invalid UTF-8 was detected in one or more arguments",
@@ -588,12 +601,7 @@ fn fail_pending(sub: &Sub, pending: &Pending) -> ! {
             true,
         ),
     };
-    fail(
-        &format!("a value is required for '{subject}' but none was supplied"),
-        None,
-        None,
-        true,
-    )
+    fail_missing_value(&subject)
 }
 
 /// clap's matcher still holds a pending or unresolved space-form value when
@@ -611,6 +619,14 @@ fn pending_value(
 fn flush_pending(sub: &Sub, pending: &Option<Pending>) {
     if let Some(pending) = pending {
         fail_pending(sub, pending);
+    }
+}
+
+/// A deferred space-form value becomes committed the moment the next token
+/// is processed successfully.
+fn commit_deferred(deferred: &mut Option<usize>, commit_order: &mut Vec<usize>) {
+    if let Some(index) = deferred.take() {
+        commit_order.push(index);
     }
 }
 
@@ -656,9 +672,7 @@ fn parse_sub(sub: &Sub, args: impl Iterator<Item = OsString>) -> Command {
                             true,
                         );
                     }
-                    if let Some(index) = deferred.take() {
-                        commit_order.push(index);
-                    }
+                    commit_deferred(&mut deferred, &mut commit_order);
                     flush_pending(sub, &pending);
                     print!("{}", sub_help(sub));
                     exit(0)
@@ -714,52 +728,27 @@ fn parse_sub(sub: &Sub, args: impl Iterator<Item = OsString>) -> Command {
                             true,
                         );
                     }
-                    if let Some(index) = deferred.take() {
-                        commit_order.push(index);
-                    }
+                    commit_deferred(&mut deferred, &mut commit_order);
                     flush_pending(sub, &pending);
                     if assigned[index] {
-                        fail(
-                            &format!("the argument '--{name}' cannot be used multiple times"),
-                            None,
-                            Some(&usage(sub)),
-                            true,
-                        );
+                        fail_duplicate(sub, flag);
                     }
                     assigned[index] = true;
                     mark_used(&mut used_order);
                     commit_order.push(index);
                     continue;
                 }
-                if let Some(index) = deferred.take() {
-                    commit_order.push(index);
-                }
+                commit_deferred(&mut deferred, &mut commit_order);
                 flush_pending(sub, &pending);
                 match eq_value {
                     Some(value) => {
                         if assigned[index] {
-                            fail(
-                                &format!(
-                                    "the argument '{}' cannot be used multiple times",
-                                    render(flag)
-                                ),
-                                None,
-                                Some(&usage(sub)),
-                                true,
-                            );
+                            fail_duplicate(sub, flag);
                         }
                         // `--css=` fails on the spot; every other missing
                         // value waits for a later flag or the end of the line.
                         if value.is_empty() {
-                            fail(
-                                &format!(
-                                    "a value is required for '{}' but none was supplied",
-                                    render(flag)
-                                ),
-                                None,
-                                None,
-                                true,
-                            );
+                            fail_missing_value(&render(flag));
                         }
                         assigned[index] = true;
                         mark_used(&mut used_order);
@@ -815,9 +804,7 @@ fn parse_sub(sub: &Sub, args: impl Iterator<Item = OsString>) -> Command {
                 );
             }
             _ => {
-                if let Some(index) = deferred.take() {
-                    commit_order.push(index);
-                }
+                commit_deferred(&mut deferred, &mut commit_order);
                 if let Some(p @ (Pending::Flag(_) | Pending::Duplicate(_))) = &pending {
                     fail_pending(sub, p);
                 }
