@@ -32,13 +32,17 @@ fn main() -> ExitCode {
         cli::print_help();
         return ExitCode::SUCCESS;
     };
-    match command {
+    let result = match command {
         Command::Check(args) => check_or_fix(args, false),
         Command::Fix(args) => check_or_fix(args, true),
         Command::Cross(args) => cross(args),
         Command::Judge(args) => judge(args),
         Command::Map(args) => map(args),
-    }
+    };
+    result.unwrap_or_else(|message| {
+        eprintln!("{message}");
+        ExitCode::FAILURE
+    })
 }
 
 /// An oracle that judges nothing and remembers every token it was shown. One
@@ -138,19 +142,14 @@ fn display(finding: &Finding) -> String {
 /// Judge bare class strings with no scanner in between: the seam that lets a
 /// test suite ask the same engine check uses. A string that is not in a file
 /// has no line to point at, so verdicts come back in input order.
-fn judge(args: JudgeArgs) -> ExitCode {
+fn judge(args: JudgeArgs) -> Result<ExitCode, String> {
     let literals: Vec<String> = if args.literals.is_empty() {
-        match std::io::read_to_string(std::io::stdin()) {
-            Ok(input) => input
-                .lines()
-                .filter(|line| !line.trim().is_empty())
-                .map(str::to_string)
-                .collect(),
-            Err(e) => {
-                eprintln!("judge: reading stdin failed: {e}");
-                return ExitCode::FAILURE;
-            }
-        }
+        std::io::read_to_string(std::io::stdin())
+            .map_err(|e| format!("judge: reading stdin failed: {e}"))?
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(str::to_string)
+            .collect()
     } else {
         args.literals
     };
@@ -165,13 +164,8 @@ fn judge(args: JudgeArgs) -> ExitCode {
                 .into_iter()
                 .collect();
             tokens.sort_unstable();
-            match compile_candidates(tokens, Some(entry.as_path())) {
-                Ok(asts) => Box::new(CssOracle::new(CompiledCandidates::from_asts(asts))),
-                Err(message) => {
-                    eprintln!("{message}");
-                    return ExitCode::FAILURE;
-                }
-            }
+            let asts = compile_candidates(tokens, Some(entry.as_path()))?;
+            Box::new(CssOracle::new(CompiledCandidates::from_asts(asts)))
         }
         None => Box::new(Memo::new(TwFuseOracle)),
     };
@@ -210,11 +204,11 @@ fn judge(args: JudgeArgs) -> ExitCode {
         );
     }
 
-    if conflicts == 0 {
+    Ok(if conflicts == 0 {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
-    }
+    })
 }
 
 /// Emit the conflict map: the scanned tokens' declaration groups plus the
@@ -222,31 +216,22 @@ fn judge(args: JudgeArgs) -> ExitCode {
 /// data for the JS map oracle, not a verdict, so a successful emit exits 0
 /// whatever the tokens conflict on. File output ends with the same newline
 /// stdout gets, so both routes are byte-identical and diffable.
-fn map(args: MapArgs) -> ExitCode {
+fn map(args: MapArgs) -> Result<ExitCode, String> {
     let files = read_paths(&args.paths);
-    let compiled = match compiled_candidates(&files, Some(&args.css)) {
-        Ok(compiled) => compiled,
-        Err(message) => {
-            eprintln!("{message}");
-            return ExitCode::FAILURE;
-        }
-    };
-    let map = compiled.conflict_map();
+    let map = compiled_candidates(&files, Some(&args.css))?.conflict_map();
     match &args.out {
         Some(path) => {
             let mut contents = json_string(&map);
             contents.push('\n');
-            if let Err(e) = std::fs::write(path, contents) {
-                eprintln!("could not write {}: {e}", path.display());
-                return ExitCode::FAILURE;
-            }
+            std::fs::write(path, contents)
+                .map_err(|e| format!("could not write {}: {e}", path.display()))?;
         }
         None => print_json(&map),
     }
-    ExitCode::SUCCESS
+    Ok(ExitCode::SUCCESS)
 }
 
-fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
+fn check_or_fix(args: ScanArgs, fixing: bool) -> Result<ExitCode, String> {
     // The stylesheet path judges the tree three times: token collection for
     // the compile batch, conflicts, typos. Each file is read and extracted
     // once and all three passes judge that corpus. The tables path judges
@@ -254,13 +239,8 @@ fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
     let (findings, unknowns) = match &args.css {
         Some(entry) => {
             let files = read_paths(&args.paths);
-            match css_oracles(&files, Some(entry)) {
-                Ok((oracle, typos)) => (scan_files(&files, &oracle), scan_files(&files, &typos)),
-                Err(message) => {
-                    eprintln!("{message}");
-                    return ExitCode::FAILURE;
-                }
-            }
+            let (oracle, typos) = css_oracles(&files, Some(entry))?;
+            (scan_files(&files, &oracle), scan_files(&files, &typos))
         }
         None => (
             scan_paths(&args.paths, &Memo::new(TwFuseOracle)),
@@ -269,9 +249,8 @@ fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
     };
 
     if args.json {
-        if fixing && let Err(e) = apply_fixes(&findings) {
-            eprintln!("fix failed: {e}");
-            return ExitCode::FAILURE;
+        if fixing {
+            apply_fixes(&findings).map_err(|e| format!("fix failed: {e}"))?;
         }
         print_json(&json!({
             "findings": findings.iter().map(|f| json!({
@@ -288,11 +267,11 @@ fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
                 "tokens": f.conflict.dropped,
             })).collect::<Vec<_>>(),
         }));
-        return if !fixing && !findings.is_empty() {
+        return Ok(if !fixing && !findings.is_empty() {
             ExitCode::FAILURE
         } else {
             ExitCode::SUCCESS
-        };
+        });
     }
 
     if findings.is_empty() {
@@ -332,35 +311,28 @@ fn check_or_fix(args: ScanArgs, fixing: bool) -> ExitCode {
 
     if !fixing {
         if findings.is_empty() {
-            return ExitCode::SUCCESS;
+            return Ok(ExitCode::SUCCESS);
         }
         println!(
             "\n{} conflicting class {}. Run \"overrule fix\" to resolve them in source.",
             findings.len(),
             plural(findings.len(), "string", "strings")
         );
-        return ExitCode::FAILURE;
+        return Ok(ExitCode::FAILURE);
     }
 
     if findings.is_empty() {
-        return ExitCode::SUCCESS;
+        return Ok(ExitCode::SUCCESS);
     }
-    match apply_fixes(&findings) {
-        Ok(changed) => {
-            println!(
-                "\nFixed {} {} across {} {}.",
-                findings.len(),
-                plural(findings.len(), "string", "strings"),
-                changed,
-                plural(changed, "file", "files")
-            );
-            ExitCode::SUCCESS
-        }
-        Err(e) => {
-            eprintln!("fix failed: {e}");
-            ExitCode::FAILURE
-        }
-    }
+    let changed = apply_fixes(&findings).map_err(|e| format!("fix failed: {e}"))?;
+    println!(
+        "\nFixed {} {} across {} {}.",
+        findings.len(),
+        plural(findings.len(), "string", "strings"),
+        changed,
+        plural(changed, "file", "files")
+    );
+    Ok(ExitCode::SUCCESS)
 }
 
 struct CrossEntry {
@@ -386,17 +358,11 @@ fn verdict(dropped: Option<&Vec<String>>) -> String {
     }
 }
 
-fn cross(args: CrossArgs) -> ExitCode {
+fn cross(args: CrossArgs) -> Result<ExitCode, String> {
     let files = read_paths(&args.scan.paths);
     // Not css_oracles: cross never judges typos, and the TypoOracle build
     // clones every compiled token.
-    let css_oracle = match compiled_candidates(&files, args.scan.css.as_ref()) {
-        Ok(compiled) => CssOracle::new(compiled),
-        Err(message) => {
-            eprintln!("{message}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let css_oracle = CssOracle::new(compiled_candidates(&files, args.scan.css.as_ref())?);
     let tables = scan_files(&files, &Memo::new(TwFuseOracle));
     let sheet = scan_files(&files, &css_oracle);
 
@@ -451,16 +417,10 @@ fn cross(args: CrossArgs) -> ExitCode {
     let mut ack_total = 0;
     let mut stale: Vec<serde_json::Value> = Vec::new();
     if let Some(ack_file) = &args.ack {
-        let parsed: serde_json::Value = match std::fs::read_to_string(ack_file)
+        let parsed: serde_json::Value = std::fs::read_to_string(ack_file)
             .map_err(|e| e.to_string())
             .and_then(|raw| serde_json::from_str(&raw).map_err(|e| e.to_string()))
-        {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                eprintln!("could not read {}: {e}", ack_file.display());
-                return ExitCode::FAILURE;
-            }
-        };
+            .map_err(|e| format!("could not read {}: {e}", ack_file.display()))?;
         let list = if parsed.is_array() {
             &parsed
         } else {
@@ -527,11 +487,11 @@ fn cross(args: CrossArgs) -> ExitCode {
             output["staleAcks"] = serde_json::Value::Array(stale);
         }
         print_json(&output);
-        return if args.ack.is_some() && !diffs.is_empty() {
+        return Ok(if args.ack.is_some() && !diffs.is_empty() {
             ExitCode::FAILURE
         } else {
             ExitCode::SUCCESS
-        };
+        });
     }
 
     for entry in &diffs {
@@ -571,11 +531,11 @@ fn cross(args: CrossArgs) -> ExitCode {
                 ack_file.display()
             );
         }
-        return if diffs.is_empty() {
+        return Ok(if diffs.is_empty() {
             ExitCode::SUCCESS
         } else {
             ExitCode::FAILURE
-        };
+        });
     }
 
     if diffs.is_empty() {
@@ -590,5 +550,5 @@ fn cross(args: CrossArgs) -> ExitCode {
             plural(diffs.len(), "disagreement", "disagreements")
         );
     }
-    ExitCode::SUCCESS
+    Ok(ExitCode::SUCCESS)
 }
