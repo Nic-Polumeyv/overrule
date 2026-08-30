@@ -1,6 +1,6 @@
 {
 	"name": "overrule",
-	"version": "0.7.3",
+	"version": "0.7.4",
 	"private": true,
 	"description": "dev-only: the version changesets bumps, plus the cross end-to-end test and the --css oracle resolve tailwindcss from here when the scanned project has none",
 	"scripts": {

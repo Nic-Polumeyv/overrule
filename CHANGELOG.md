@@ -1,5 +1,11 @@
 # overrule
 
+## 0.7.4
+
+### Patch Changes
+
+- [`ae4da5a`](https://github.com/Nic-Polumeyv/overrule/commit/ae4da5ab1768c3d05c5a5b34b70e3a050a5fe6a7) Thanks [@Nic-Polumeyv](https://github.com/Nic-Polumeyv)! - new overrule-linux-arm64-musl platform package: Alpine on ARM gets a prebuilt binary
+
 ## 0.7.3
 
 ### Patch Changes
